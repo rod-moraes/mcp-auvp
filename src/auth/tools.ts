@@ -16,6 +16,7 @@ import {
   completeSsoLogin as completeSsoLoginFlow,
   createSsoLoginUrl,
 } from "./sso.js";
+import { getMcpProjectInfo } from "../core/project.js";
 import {
   defineTool,
   jsonResult,
@@ -73,11 +74,14 @@ export const authToolDefinitions: ToolDefinition[] = [
   ),
   defineTool(
     "auvp_get_auth_status",
-    "Show whether this MCP process currently has an in-memory AUVP auth cookie or bearer token without revealing secret values.",
+    "Show AUVP auth status (bearer, cookies, session) without revealing secrets, plus MCP project metadata (GitHub repository and npx install spec).",
     emptyInputSchema,
     async (client, args) => {
       emptyArgsSchema.parse(args ?? {});
-      return jsonResult(client.getAuthStatus());
+      return jsonResult({
+        ...client.getAuthStatus(),
+        project: getMcpProjectInfo(),
+      });
     },
   ),
 ];

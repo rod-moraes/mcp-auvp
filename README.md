@@ -1,12 +1,14 @@
 # MCP AUVP
 
-Servidor MCP local para consultar os produtos AUVP via chat (Cursor, Claude Desktop, etc.):
+Servidor MCP local para consultar os produtos AUVP via chat (Cursor, Claude Desktop, etc.).
+
+**Repositório:** [github.com/rod-moraes/mcp-auvp](https://github.com/rod-moraes/mcp-auvp)
 
 | Produto | Base | Documentação |
 |---------|------|--------------|
 | **Finanças** | `https://financas-api.auvp.com.br` | **[src/financas/README.md](src/financas/README.md)** — 32 tools (contas, transações, dashboard, orçamento) |
 | **Analítica** | `https://analitica.auvp.com.br` | **[src/analitica/README.md](src/analitica/README.md)** — 44 tools (rankings, fundamentos, mercado, comparador) |
-| **Comunidade** | `https://comunidade.auvp.com.br` | 8 tools — busca, fóruns, tópicos, notificações e rankings (`auvp_comunidade_*`) |
+| **Comunidade** | `https://comunidade.auvp.com.br` | **[src/comunidade/README.md](src/comunidade/README.md)** — 8 tools (busca, fóruns, tópicos, notificações, rankings) |
 
 O servidor usa transporte `stdio` e pode ser instalado direto do GitHub com `npx`, sem clonar o repositório.
 
@@ -24,17 +26,18 @@ O servidor usa transporte `stdio` e pode ser instalado direto do GitHub com `npx
 
 Crie ou edite `~/.cursor/mcp.json` (global) ou `.cursor/mcp.json` (só neste projeto).
 
-Substitua `SEU_USUARIO` pelo usuário ou organização do GitHub onde o repo está publicado:
+Substitua `SEU_USUARIO` pelo seu usuário local (caminhos em `env`):
 
 ```json
 {
   "mcpServers": {
     "auvp-financas": {
       "command": "npx",
-      "args": ["-y", "github:SEU_USUARIO/mcp-auvp"],
+      "args": ["-y", "github:rod-moraes/mcp-auvp"],
       "env": {
         "AUVP_FINANCAS_ACCESS_TOKEN_FILE": "/Users/SEU_USUARIO/.auvp-financas/access-token",
-        "AUVP_ANALITICA_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/analitica-cookie"
+        "AUVP_ANALITICA_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/analitica-cookie",
+        "AUVP_COMUNIDADE_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/comunidade-cookie"
       }
     }
   }
@@ -48,13 +51,13 @@ Exemplo pronto: [.cursor/mcp.json.example](.cursor/mcp.json.example).
 **Repositório privado?** Use token no URL:
 
 ```json
-"args": ["-y", "git+https://TOKEN@github.com/SEU_USUARIO/mcp-auvp.git"]
+"args": ["-y", "git+https://TOKEN@github.com/rod-moraes/mcp-auvp.git"]
 ```
 
 **Fixar versão** (evita pegar `main` automaticamente):
 
 ```json
-"args": ["-y", "github:SEU_USUARIO/mcp-auvp#main"]
+"args": ["-y", "github:rod-moraes/mcp-auvp#main"]
 ```
 
 ### Passo 2 — Reiniciar o MCP no Cursor
@@ -82,7 +85,7 @@ Na primeira vez (ou sessão expirada), o navegador abre para você logar no SSO.
 Se o login falhar por falta do navegador embutido, rode **uma vez** no terminal:
 
 ```bash
-npx -y --package=github:SEU_USUARIO/mcp-auvp -c "playwright install chromium"
+npx -y --package=github:rod-moraes/mcp-auvp -c "playwright install chromium"
 ```
 
 Se você clonou o repositório:
@@ -98,6 +101,7 @@ No chat, peça algo como:
 
 - Finanças: *"Liste minhas contas com `auvp_financas_list_accounts`"*
 - Analítica: *"Busque o ranking de dividend yield com `auvp_analitica_get_ranking`"*
+- Comunidade: *"Leia o tópico X com `auvp_comunidade_get_topic`"*
 
 Confirme o status com `auvp_get_auth_status`.
 
@@ -109,6 +113,7 @@ Confirme o status com `auvp_get_auth_status`.
 |---------|----------|
 | `~/.auvp-financas/access-token` | Bearer token da API Finanças |
 | `~/.auvp-financas/analitica-cookie` | Cookie de sessão do Analítica |
+| `~/.auvp-financas/comunidade-cookie` | Cookie de sessão IPS da Comunidade |
 | `~/.auvp-financas/browser-profile/` | Perfil Playwright (sessão SSO no navegador) |
 | `~/.auvp-financas/storage-state.json` | Backup extra de cookies |
 
@@ -131,7 +136,7 @@ export AUVP_FINANCAS_AUTO_LOGIN_ON_START=0
 Para contribuir ou rodar sem `npx` do GitHub:
 
 ```bash
-git clone https://github.com/SEU_USUARIO/mcp-auvp.git
+git clone https://github.com/rod-moraes/mcp-auvp.git
 cd mcp-auvp
 npm install          # já dispara o build (prepare)
 npm run playwright:install   # primeira vez, para login
@@ -149,7 +154,8 @@ Configuração MCP apontando para o clone:
       "cwd": "/caminho/para/mcp-auvp",
       "env": {
         "AUVP_FINANCAS_ACCESS_TOKEN_FILE": "/Users/SEU_USUARIO/.auvp-financas/access-token",
-        "AUVP_ANALITICA_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/analitica-cookie"
+        "AUVP_ANALITICA_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/analitica-cookie",
+        "AUVP_COMUNIDADE_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/comunidade-cookie"
       }
     }
   }
@@ -177,6 +183,8 @@ npm run dev
 | `AUVP_FINANCAS_ACCESS_TOKEN` | — | Token inline (alternativa ao arquivo) |
 | `AUVP_ANALITICA_COOKIE_FILE` | `~/.auvp-financas/analitica-cookie` | Cookie do Analítica |
 | `AUVP_ANALITICA_COOKIE` | — | Cookie inline (alternativa ao arquivo) |
+| `AUVP_COMUNIDADE_COOKIE_FILE` | `~/.auvp-financas/comunidade-cookie` | Cookie IPS da Comunidade |
+| `AUVP_COMUNIDADE_COOKIE` | — | Cookie inline (alternativa ao arquivo) |
 | `AUVP_FINANCAS_BROWSER_PROFILE_DIR` | `~/.auvp-financas/browser-profile` | Perfil Playwright |
 | `AUVP_FINANCAS_STORAGE_STATE_FILE` | `~/.auvp-financas/storage-state.json` | Backup de sessão |
 | `AUVP_FINANCAS_LOGIN_FRESH` | — | `1` força login do zero |
@@ -202,7 +210,7 @@ SSO (opcional):
 | Tool | Uso |
 |------|-----|
 | `auvp_ensure_auth` | Login/renovação automática (recomendado) |
-| `auvp_get_auth_status` | Verifica bearer, cookie Analítica e sessão |
+| `auvp_get_auth_status` | Verifica bearer, cookies Analítica/Comunidade e sessão |
 | `auvp_create_sso_login_url` | URL de login SSO (fluxo manual) |
 | `auvp_complete_sso_login` | Conclui login com `callbackUrl` |
 
@@ -220,18 +228,9 @@ Sessão, rankings, fundamentos por ativo, mercado, notícias e simulador. Soment
 
 ### Comunidade — `auvp_comunidade_*`
 
-| Tool | Endpoint |
-|------|----------|
-| `list_observed_routes` | Catálogo local |
-| `list_forums` | Fóruns estáticos (ids/slugs) |
-| `search` | `GET /search/` (JSON + HTML) |
-| `list_forum_topics` | `GET /?forumId=` (HTML) |
-| `get_topic` | `GET /topic/:id-:slug/` (HTML) |
-| `list_notifications` | `GET /notifications/` (JSON) |
-| `get_top_contributors` | Widget IPS `topContributors` |
-| `get_most_solved` | Widget IPS `mostSolved` |
+Documentação: **[src/comunidade/README.md](src/comunidade/README.md)**
 
-Varredura: `npm run scan:comunidade` (requer cookie IPS em `~/.auvp-financas/comunidade-cookie`).
+Busca, listagem de fóruns/tópicos, leitura de posts e comentários, notificações e rankings IPS. Somente leitura. Varredura: `npm run scan:comunidade`.
 
 ---
 
@@ -256,10 +255,15 @@ npm test
 npm run build
 npm run scan:financas    # requer auth
 npm run scan:analitica   # requer auth (bearer + cookie)
+npm run scan:comunidade  # requer cookie IPS
 ```
 
 ---
 
 ## Origem do catálogo
 
-Contrato inicial extraído de HARs (`financas.auvp.com.br`, `analitica.auvp.com.br`). Novas rotas podem ser descobertas com o skill [auvp-scrapling](.cursor/skills/auvp-scrapling/SKILL.md) — ver READMEs de cada módulo.
+Contrato inicial extraído de HARs e probes Scrapling nos três produtos. Novas rotas podem ser descobertas com o skill [auvp-scrapling](.cursor/skills/auvp-scrapling/SKILL.md) — ver READMEs de cada módulo:
+
+- [Finanças](src/financas/README.md)
+- [Analítica](src/analitica/README.md)
+- [Comunidade](src/comunidade/README.md)

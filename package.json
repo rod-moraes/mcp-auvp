@@ -1,9 +1,17 @@
 {
   "name": "mcp-auvp-financas",
   "version": "0.1.0",
-  "description": "MCP server for AUVP Financas API data extraction.",
+  "description": "MCP server for AUVP Finanças, Analítica and Comunidade.",
   "type": "module",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rod-moraes/mcp-auvp.git"
+  },
+  "homepage": "https://github.com/rod-moraes/mcp-auvp#readme",
+  "bugs": {
+    "url": "https://github.com/rod-moraes/mcp-auvp/issues"
+  },
   "files": [
     "bin",
     "dist",

@@ -4,11 +4,12 @@
       "command": "npx",
       "args": [
         "-y",
-        "github:SEU_USUARIO/mcp-auvp"
+        "github:rod-moraes/mcp-auvp"
       ],
       "env": {
         "AUVP_FINANCAS_ACCESS_TOKEN_FILE": "/Users/SEU_USUARIO/.auvp-financas/access-token",
-        "AUVP_ANALITICA_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/analitica-cookie"
+        "AUVP_ANALITICA_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/analitica-cookie",
+        "AUVP_COMUNIDADE_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/comunidade-cookie"
       }
     }
   }

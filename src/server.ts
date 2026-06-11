@@ -9,6 +9,7 @@ import { loadPersistedComunidadeCookieHeader } from "./comunidade/cookies.js";
 import { loadPersistedBearerToken } from "./auth/storage.js";
 import { bootstrapAuthOnStartup } from "./auth/ensure-auth.js";
 import { AuvpFinancasClient } from "./core/http-client.js";
+import { MCP_GITHUB_REPOSITORY } from "./core/project.js";
 import { callAuvpTool, listAuvpTools } from "./mcp/registry.js";
 
 export function createAuvpFinancasClient(): AuvpFinancasClient {
@@ -42,6 +43,7 @@ export function createServer(client = createAuvpFinancasClient()): Server {
       capabilities: {
         tools: {},
       },
+      instructions: `MCP AUVP — Finanças, Analítica e Comunidade. Repositório: ${MCP_GITHUB_REPOSITORY}. Auth: auvp_ensure_auth.`,
     },
   );
 
