@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "auvp-financas": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "github:SEU_USUARIO/mcp-auvp"
+      ],
+      "env": {
+        "AUVP_FINANCAS_ACCESS_TOKEN_FILE": "/Users/SEU_USUARIO/.auvp-financas/access-token",
+        "AUVP_ANALITICA_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/analitica-cookie"
+      }
+    }
+  }
+}

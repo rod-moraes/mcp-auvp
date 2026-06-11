@@ -1,0 +1,42 @@
+# Dependências e build
+node_modules/
+dist/
+coverage/
+.venv-scrapling/
+
+# Sistema / IDE
+.DS_Store
+*.log
+.idea/
+.vscode/
+.cursor/mcp.json
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+
+# Auth, secrets e capturas de tráfego
+.env
+.env.*
+*.har
+.auvp-financas/
+access-token
+*-cookie
+storage-state.json
+browser-profile/
+
+# Relatórios pessoais e artefatos gerados
+gastos-*.html
+relatorio-*.html
+relatorio-*.pdf
+*.pdf
+screenshots/
+data/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

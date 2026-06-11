@@ -1,0 +1,3 @@
+# Seguir https://scrapling.readthedocs.io/en/latest/index.html#installation
+# pip install scrapling sozinho NÃO inclui fetchers — usar extras:
+scrapling[all]>=0.4.9

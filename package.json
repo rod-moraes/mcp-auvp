@@ -1,0 +1,43 @@
+{
+  "name": "mcp-auvp-financas",
+  "version": "0.1.0",
+  "description": "MCP server for AUVP Financas API data extraction.",
+  "type": "module",
+  "private": true,
+  "files": [
+    "bin",
+    "dist",
+    "src",
+    "package.json",
+    "README.md"
+  ],
+  "bin": {
+    "mcp-auvp-financas": "./bin/run.mjs"
+  },
+  "scripts": {
+    "prepare": "npm run build",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/index.ts",
+    "playwright:install": "playwright install chromium",
+    "test": "vitest run",
+    "scan:financas": "tsx scripts/scan-financas-tools.ts",
+    "scan:analitica": "tsx scripts/scan-analitica-tools.ts",
+    "audit:analitica": "tsx scripts/audit-analitica-tools.ts",
+    "scan:comunidade": "tsx scripts/scan-comunidade-tools.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.1",
+    "playwright": "^1.55.0",
+    "tsx": "^4.20.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.15",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  }
+}
