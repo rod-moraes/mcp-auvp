@@ -1,5 +1,5 @@
 {
-  "name": "mcp-auvp-financas",
+  "name": "mcp-auvp",
   "version": "0.1.0",
   "description": "MCP server for AUVP Finanças, Analítica and Comunidade.",
   "type": "module",
@@ -20,7 +20,7 @@
     "README.md"
   ],
   "bin": {
-    "mcp-auvp-financas": "./bin/run.mjs"
+    "mcp-auvp": "./bin/run.mjs"
   },
   "scripts": {
     "prepare": "npm run build",

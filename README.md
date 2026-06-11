@@ -24,27 +24,20 @@ O servidor usa transporte `stdio` e pode ser instalado direto do GitHub com `npx
 
 ### Passo 1 — Configurar o MCP no Cursor
 
-Crie ou edite `~/.cursor/mcp.json` (global) ou `.cursor/mcp.json` (só neste projeto).
-
-Substitua `SEU_USUARIO` pelo seu usuário local (caminhos em `env`):
+Crie ou edite `~/.cursor/mcp.json` (global) ou `.cursor/mcp.json` (só neste projeto):
 
 ```json
 {
   "mcpServers": {
-    "auvp-financas": {
+    "mcp-auvp": {
       "command": "npx",
-      "args": ["-y", "github:rod-moraes/mcp-auvp"],
-      "env": {
-        "AUVP_FINANCAS_ACCESS_TOKEN_FILE": "/Users/SEU_USUARIO/.auvp-financas/access-token",
-        "AUVP_ANALITICA_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/analitica-cookie",
-        "AUVP_COMUNIDADE_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/comunidade-cookie"
-      }
+      "args": ["-y", "github:rod-moraes/mcp-auvp"]
     }
   }
 }
 ```
 
-> No **Linux**, troque `/Users/SEU_USUARIO` por `/home/SEU_USUARIO`. No **Windows**, use barras normais, ex.: `C:/Users/SEU_USUARIO/.auvp-financas/access-token`.
+Token e cookies são salvos automaticamente em `~/.auvp-financas/` — não é preciso configurar `env` no `mcp.json`.
 
 Exemplo pronto: [.cursor/mcp.json.example](.cursor/mcp.json.example).
 
@@ -148,15 +141,10 @@ Configuração MCP apontando para o clone:
 ```json
 {
   "mcpServers": {
-    "auvp-financas": {
+    "mcp-auvp": {
       "command": "npx",
-      "args": ["-y", "mcp-auvp-financas"],
-      "cwd": "/caminho/para/mcp-auvp",
-      "env": {
-        "AUVP_FINANCAS_ACCESS_TOKEN_FILE": "/Users/SEU_USUARIO/.auvp-financas/access-token",
-        "AUVP_ANALITICA_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/analitica-cookie",
-        "AUVP_COMUNIDADE_COOKIE_FILE": "/Users/SEU_USUARIO/.auvp-financas/comunidade-cookie"
-      }
+      "args": ["-y", "mcp-auvp"],
+      "cwd": "/caminho/para/mcp-auvp"
     }
   }
 }
@@ -171,6 +159,18 @@ npm run dev
 ---
 
 ## Variáveis de ambiente
+
+Opcionais — os defaults funcionam sem configurar nada no `mcp.json`. Só declare em `env` se precisar de **caminho customizado** para token/cookies ou **valor inline** (sem arquivo em disco):
+
+```json
+"env": {
+  "AUVP_FINANCAS_ACCESS_TOKEN_FILE": "/outro/caminho/access-token",
+  "AUVP_ANALITICA_COOKIE_FILE": "/outro/caminho/analitica-cookie",
+  "AUVP_COMUNIDADE_COOKIE_FILE": "/outro/caminho/comunidade-cookie"
+}
+```
+
+Alternativa inline (sem arquivo): `AUVP_FINANCAS_ACCESS_TOKEN`, `AUVP_ANALITICA_COOKIE`, `AUVP_COMUNIDADE_COOKIE`.
 
 | Variável | Default | Descrição |
 |----------|---------|-----------|

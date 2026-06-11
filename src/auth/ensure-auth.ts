@@ -154,7 +154,7 @@ async function ensureSecondarySiteCookies(
   }
 
   console.error(
-    "[auvp-financas] Cookie do Analítica ou da Comunidade ausente — abrindo navegador visível…",
+    "[mcp-auvp] Cookie do Analítica ou da Comunidade ausente — abrindo navegador visível…",
   );
   await refreshSecondarySiteCookies({ headless: false });
   applyPersistedAuthToClient(client);
@@ -364,11 +364,11 @@ export async function bootstrapAuthOnStartup(
   const bootstrapOptions = getBootstrapAuthOptions(env);
   if (bootstrapOptions.forceBrowser) {
     console.error(
-      "[auvp-financas] Inicialização do MCP — abrindo navegador para renovar login do Finanças, Analítica e Comunidade…",
+      "[mcp-auvp] Inicialização do MCP — abrindo navegador para renovar login do Finanças, Analítica e Comunidade…",
     );
   } else {
     console.error(
-      "[auvp-financas] Verificando autenticação na inicialização do MCP…",
+      "[mcp-auvp] Verificando autenticação na inicialização do MCP…",
     );
   }
 
@@ -376,18 +376,18 @@ export async function bootstrapAuthOnStartup(
 
   if (result.status === "authenticated") {
     console.error(
-      `[auvp-financas] Autenticado (${result.method}): ${result.message}`,
+      `[mcp-auvp] Autenticado (${result.method}): ${result.message}`,
     );
   } else if (result.status === "login_required") {
     console.error(
-      `[auvp-financas] Login pendente (${result.method}): ${result.message ?? result.status}`,
+      `[mcp-auvp] Login pendente (${result.method}): ${result.message ?? result.status}`,
     );
   } else if (result.status === "failed") {
     console.error(
-      `[auvp-financas] Autenticação incompleta (${result.method}): ${result.message ?? result.status}`,
+      `[mcp-auvp] Autenticação incompleta (${result.method}): ${result.message ?? result.status}`,
     );
   } else {
-    console.error(`[auvp-financas] ${result.message ?? result.status}`);
+    console.error(`[mcp-auvp] ${result.message ?? result.status}`);
   }
 
   return result;

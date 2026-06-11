@@ -36,7 +36,7 @@ export function createAuvpFinancasClient(): AuvpFinancasClient {
 export function createServer(client = createAuvpFinancasClient()): Server {
   const server = new Server(
     {
-      name: "mcp-auvp-financas",
+      name: "mcp-auvp",
       version: "0.1.0",
     },
     {
@@ -71,7 +71,7 @@ export async function runStdioServer(): Promise<void> {
   void bootstrapAuthOnStartup(client).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(
-      `[auvp-financas] Falha ao autenticar na inicialização: ${message}`,
+      `[mcp-auvp] Falha ao autenticar na inicialização: ${message}`,
     );
   });
 }

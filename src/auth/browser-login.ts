@@ -103,7 +103,7 @@ async function captureAnaliticaCookies(
   page: Page,
   timeoutMs = 60_000,
 ): Promise<string | undefined> {
-  console.error("[auvp-financas] Coletando cookies do Analítica…");
+  console.error("[mcp-auvp] Coletando cookies do Analítica…");
 
   page.on("framenavigated", (frame) => {
     if (frame !== page.mainFrame()) {
@@ -115,7 +115,7 @@ async function captureAnaliticaCookies(
       url.includes("analitica.auvp.com.br") ||
       url.includes("/api/auth/signin/callback")
     ) {
-      console.error(`[auvp-financas] Analítica: ${url}`);
+      console.error(`[mcp-auvp] Analítica: ${url}`);
     }
   });
 
@@ -148,7 +148,7 @@ async function captureAnaliticaCookies(
 
     if (hasAnaliticaSessionCookie(header)) {
       const file = persistAnaliticaCookieHeader(header);
-      console.error(`[auvp-financas] Cookie do Analítica salvo em ${file}`);
+      console.error(`[mcp-auvp] Cookie do Analítica salvo em ${file}`);
       return file;
     }
 
@@ -160,7 +160,7 @@ async function captureAnaliticaCookies(
   }
 
   console.error(
-    "[auvp-financas] Cookies do Analítica ainda não disponíveis após visitar o site.",
+    "[mcp-auvp] Cookies do Analítica ainda não disponíveis após visitar o site.",
   );
   return undefined;
 }
@@ -170,9 +170,9 @@ async function captureComunidadeCookies(
   page: Page,
   timeoutMs = 30_000,
 ): Promise<string | undefined> {
-  console.error("[auvp-financas] Coletando cookies da Comunidade…");
+  console.error("[mcp-auvp] Coletando cookies da Comunidade…");
   console.error(
-    "[auvp-financas] Se necessário, faça login em comunidade.auvp.com.br na janela do navegador.",
+    "[mcp-auvp] Se necessário, faça login em comunidade.auvp.com.br na janela do navegador.",
   );
 
   try {
@@ -199,7 +199,7 @@ async function captureComunidadeCookies(
 
     if (hasComunidadeSessionCookie(header)) {
       const file = persistComunidadeCookieHeader(header);
-      console.error(`[auvp-financas] Cookie da Comunidade salvo em ${file}`);
+      console.error(`[mcp-auvp] Cookie da Comunidade salvo em ${file}`);
       return file;
     }
 
@@ -209,7 +209,7 @@ async function captureComunidadeCookies(
 
     if (Date.now() - lastReminderAt >= 15_000) {
       console.error(
-        "[auvp-financas] Aguardando login na Comunidade… conclua o SSO na janela aberta.",
+        "[mcp-auvp] Aguardando login na Comunidade… conclua o SSO na janela aberta.",
       );
       lastReminderAt = Date.now();
     }
@@ -218,7 +218,7 @@ async function captureComunidadeCookies(
   }
 
   console.error(
-    "[auvp-financas] Cookies da Comunidade ainda não disponíveis após visitar o site.",
+    "[mcp-auvp] Cookies da Comunidade ainda não disponíveis após visitar o site.",
   );
   return undefined;
 }
@@ -331,7 +331,7 @@ async function launchPersistentContext(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(
-      `[auvp-financas] Chrome não disponível (${message}). Tentando Chromium embutido…`,
+      `[mcp-auvp] Chrome não disponível (${message}). Tentando Chromium embutido…`,
     );
     return chromium.launchPersistentContext(profileDir, baseOptions);
   }
@@ -386,7 +386,7 @@ async function runInteractiveBrowserLogin(
 
   if (openInteractiveContext) {
     console.error(
-      "[auvp-financas] Já existe uma janela de login aberta. Conclua o login nela.",
+      "[mcp-auvp] Já existe uma janela de login aberta. Conclua o login nela.",
     );
     return undefined;
   }
@@ -402,13 +402,13 @@ async function runInteractiveBrowserLogin(
 
     const url = frame.url();
     if (url.includes("/auth/auvp/callback") || url.includes("financas.auvp.com.br")) {
-      console.error("[auvp-financas] Detectada navegação pós-login, aguardando token…");
+      console.error("[mcp-auvp] Detectada navegação pós-login, aguardando token…");
     }
   });
 
   try {
     console.error(
-      "[auvp-financas] Abrindo navegador para login no SSO. A janela permanece aberta até o token ser capturado.",
+      "[mcp-auvp] Abrindo navegador para login no SSO. A janela permanece aberta até o token ser capturado.",
     );
 
     await page.goto(LOGIN_URL, {
@@ -423,7 +423,7 @@ async function runInteractiveBrowserLogin(
 
     if (!token) {
       console.error(
-        "[auvp-financas] Login ainda não concluído. A janela do navegador foi mantida aberta — finalize o login e chame auvp_ensure_auth novamente.",
+        "[mcp-auvp] Login ainda não concluído. A janela do navegador foi mantida aberta — finalize o login e chame auvp_ensure_auth novamente.",
       );
       return undefined;
     }
@@ -536,7 +536,7 @@ export async function refreshSecondarySiteCookies(
     let context: BrowserContext | undefined;
     try {
       console.error(
-        "[auvp-financas] Tentando capturar cookies do Analítica e da Comunidade em segundo plano…",
+        "[mcp-auvp] Tentando capturar cookies do Analítica e da Comunidade em segundo plano…",
       );
       context = await launchPersistentContext(profileDir, true);
       const page = await getOrCreatePage(context);
@@ -553,7 +553,7 @@ export async function refreshSecondarySiteCookies(
   }
 
   console.error(
-    "[auvp-financas] Abrindo navegador visível para concluir login no Analítica e na Comunidade…",
+    "[mcp-auvp] Abrindo navegador visível para concluir login no Analítica e na Comunidade…",
   );
 
   let context: BrowserContext;
@@ -561,7 +561,7 @@ export async function refreshSecondarySiteCookies(
     context = await launchPersistentContext(profileDir, false);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[auvp-financas] Falha ao abrir o navegador: ${message}`);
+    console.error(`[mcp-auvp] Falha ao abrir o navegador: ${message}`);
     throw error;
   }
 
@@ -585,19 +585,19 @@ export async function refreshSecondarySiteCookies(
       !needsComunidade || Boolean(comunidadeCookieFile);
     if (capturedAnalitica && capturedComunidade) {
       console.error(
-        "[auvp-financas] Cookies secundários capturados. Fechando navegador.",
+        "[mcp-auvp] Cookies secundários capturados. Fechando navegador.",
       );
       await closeInteractiveBrowser();
     } else {
       console.error(
-        "[auvp-financas] Navegador mantido aberto — conclua o login e chame auvp_ensure_auth.",
+        "[mcp-auvp] Navegador mantido aberto — conclua o login e chame auvp_ensure_auth.",
       );
     }
 
     return { analiticaCookieFile, comunidadeCookieFile };
   } catch (error) {
     console.error(
-      "[auvp-financas] Navegador mantido aberto após erro na captura de cookies secundários.",
+      "[mcp-auvp] Navegador mantido aberto após erro na captura de cookies secundários.",
     );
     throw error;
   }
@@ -622,7 +622,7 @@ export async function runBrowserLogin(
 ): Promise<BrowserLoginResult | undefined> {
   if (activeLogin) {
     console.error(
-      "[auvp-financas] Login já em andamento, aguardando a tentativa atual…",
+      "[mcp-auvp] Login já em andamento, aguardando a tentativa atual…",
     );
     return activeLogin;
   }
