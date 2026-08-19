@@ -15,7 +15,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const report = await scanFinancasTools(client);
+  const allowWrites = process.env.AUVP_SCAN_ALLOW_WRITES === "1";
+  const report = await scanFinancasTools(client, { allowWrites });
   const outputPath = resolve("data/financas-tools-report.json");
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
@@ -23,6 +24,7 @@ async function main(): Promise<void> {
   console.log(
     `Resumo: ${report.summary.ok} ok, ${report.summary.error} erro inesperado, ${report.summary.expectedError} erro esperado, ${report.summary.skipped} ignorados (total ${report.summary.total})`,
   );
+  console.log(`Escritas ao vivo: ${allowWrites ? "habilitadas" : "desabilitadas"}`);
 
   const failures = report.results.filter(
     (result) => result.isError && !result.skipped && !result.expectedFailure,

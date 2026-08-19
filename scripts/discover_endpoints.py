@@ -15,11 +15,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from auvp_auth import (  # noqa: E402
     ANALITICA_ORIGIN,
-    BROWSER_PROFILE_DIR,
     COMUNIDADE_ORIGIN,
+    CARTEIRA_API,
+    CARTEIRA_ORIGIN,
+    DICIONARIO_API,
     FINANCAS_API,
     FINANCAS_ORIGIN,
     headers_for_site,
+    load_bearer_token,
+    load_carteira_token,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,12 +48,26 @@ SITE_CONFIG: dict[str, dict[str, str]] = {
         "xhr_regex": r"comunidade\.auvp\.com\.br/",
         "host_filter": "comunidade.auvp.com.br",
     },
+    "carteira": {
+        "base": CARTEIRA_ORIGIN,
+        "headers": "carteira",
+        "xhr_regex": r"ferramentas-backend\.auvp\.com\.br/",
+        "host_filter": "ferramentas-backend.auvp.com.br",
+    },
+    "dicionario": {
+        "base": f"{COMUNIDADE_ORIGIN}/dicion%C3%A1rio/",
+        "headers": "dicionario",
+        "xhr_regex": r"worker\.auvp\.com\.br/dictionary",
+        "host_filter": "worker.auvp.com.br",
+    },
 }
 
 PROBE_SITES = {
     "financas_api": {"base": FINANCAS_API, "headers": "financas_api"},
     "analitica": {"base": ANALITICA_ORIGIN, "headers": "analitica"},
     "comunidade": {"base": COMUNIDADE_ORIGIN, "headers": "comunidade"},
+    "carteira": {"base": CARTEIRA_API, "headers": "carteira"},
+    "dicionario": {"base": DICIONARIO_API, "headers": "dicionario"},
 }
 
 FINANCAS_PAGE_ROUTES = [
@@ -61,8 +79,6 @@ FINANCAS_PAGE_ROUTES = [
     "/dashboard/invoices",
     "/dashboard/tags",
     "/settings/profile",
-    "/settings/categories",
-    "/settings/types",
 ]
 
 ANALITICA_PAGE_ROUTES = [
@@ -85,7 +101,7 @@ ANALITICA_PAGE_ROUTES = [
     "/noticias",
     "/rankings",
     "/rankings/acoes/dividend_yield",
-    "/rankings/stocks/market_cap",
+    "/rankings/stocks/valor_mercado",
     "/reits",
     "/renda-fixa",
     "/simulador-de-rentabilidade",
@@ -110,50 +126,12 @@ ANALITICA_PROBE_PATHS = [
     "/api/codes/ranked-by-rating",
     "/api/favorites/list",
     "/api/assets-config",
+    "/api/credit-portfolio",
     "/api/search",
-    "/api/search/codes",
     "/api/indicators",
-    "/api/indices",
     "/api/news",
-    "/api/calendar",
-    "/api/calendar/dividends",
-    "/api/calendar/results",
-    "/api/rankings",
-    "/api/rankings/types",
-    "/api/compare",
-    "/api/simulator",
-    "/api/fixed-income",
     "/api/segments",
-    "/api/companies",
-    "/api/companies/search",
-    "/api/watchlist",
-    "/api/watchlist/list",
-    "/api/portfolio",
-    "/api/portfolio/list",
-    "/api/etf",
-    "/api/etf/list",
-    "/api/fii",
-    "/api/fii/list",
-    "/api/stock",
-    "/api/stock/list",
-    "/api/reit",
-    "/api/reit/list",
-    "/api/agenda",
-    "/api/agenda/dividends",
-    "/api/agenda/results",
-    "/api/calculators",
-    "/api/calculators/list",
-    "/api/analysis",
-    "/api/analysis/list",
-    "/api/viability",
-    "/api/viability/:ticker",
-    "/api/ratings",
-    "/api/ratings/:ticker",
     "/api/sectors",
-    "/api/sectors/list",
-    "/api/market",
-    "/api/market/indices",
-    "/api/market/summary",
     "/api/bff",
 ]
 
@@ -163,9 +141,6 @@ COMUNIDADE_PAGE_ROUTES = [
     "/search/",
     "/?forumId=12",
     "/?forumId=61",
-    "/forum/61-devs-projetos/",
-    "/topic/43093-empreender-agora-ou-esperar/",
-    "/profile/20109-eddy-paulini/",
 ]
 
 COMUNIDADE_PROBE_PATHS = [
@@ -185,11 +160,29 @@ COMUNIDADE_PROBE_PATHS = [
     ("/api/core/hello", None),
 ]
 
+CARTEIRA_PAGE_ROUTES = ["/carteira"]
+CARTEIRA_PROBE_PATHS = [
+    ("/auth/me", None),
+    ("/users/classification", None),
+    ("/assets/sugestions", "type=acoes_nacionais&search=PETR"),
+    ("/config", None),
+]
+
+DICIONARIO_PAGE_ROUTES = ["/dicion%C3%A1rio/", "/dicion%C3%A1rio/?page=2"]
+DICIONARIO_PROBE_PATHS = [
+    ("/dictionary", "page=1&search=&categories=&letter=&pending=true&author=false"),
+    ("/dictionary", "page=2&search=&categories=&letter=&pending=true&author=false"),
+    ("/dictionary", "page=1&search=ação&categories=&letter=&pending=true&author=false"),
+]
+
 FINANCAS_PROBE_PATHS = [
+    "/access/status",
+    "/feature-flags/me",
     "/users/profile",
     "/users",
     "/accounts",
     "/accounts/lastTransactions",
+    "/accounts/hidden",
     "/transactions",
     "/transactions/export",
     "/dashboard",
@@ -199,12 +192,8 @@ FINANCAS_PROBE_PATHS = [
     "/budgets/summary",
     "/categories",
     "/categories/tree",
-    "/user-categories",
     "/tags",
     "/banks",
-    "/bridge/status",
-    "/auth/validate-token",
-    "/auth/refresh-token",
 ]
 
 
@@ -235,6 +224,16 @@ def summarize_response(resp: Any) -> dict[str, Any]:
         body = resp.json()
         if isinstance(body, dict):
             entry["responseKeys"] = list(body.keys())
+            entry["arrayFields"] = {
+                key: {
+                    "length": len(value),
+                    "itemKeys": sorted(value[0].keys())
+                    if value and isinstance(value[0], dict)
+                    else [],
+                }
+                for key, value in body.items()
+                if isinstance(value, list)
+            }
             if "data" in body:
                 data = body["data"]
                 entry["dataType"] = (
@@ -243,24 +242,44 @@ def summarize_response(resp: Any) -> dict[str, Any]:
                 )
             if "content" in body and isinstance(body["content"], str):
                 entry["contentHtmlBytes"] = len(body["content"])
+        elif isinstance(body, list):
+            entry["responseType"] = "array"
+            entry["arrayLength"] = len(body)
+            entry["itemKeys"] = (
+                sorted(body[0].keys()) if body and isinstance(body[0], dict) else []
+            )
     except Exception:
         text = getattr(resp, "body", None) or getattr(resp, "html_content", None) or ""
-        preview = str(text)[:300]
-        if preview:
-            entry["bodyPreview"] = preview
+        if text:
             entry["bodyBytes"] = len(str(text))
     return entry
 
 
 def dynamic_fetch_kwargs(site: str) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
-        "headers": headers_for_site(SITE_CONFIG[site]["headers"]),  # type: ignore[arg-type]
         "headless": True,
         "network_idle": True,
     }
-    if site == "financas" and BROWSER_PROFILE_DIR.is_dir():
-        kwargs["user_data_dir"] = str(BROWSER_PROFILE_DIR)
-        kwargs["real_chrome"] = True
+    if site != "dicionario":
+        kwargs["headers"] = headers_for_site(SITE_CONFIG[site]["headers"])  # type: ignore[arg-type]
+    if site == "financas":
+        token = load_bearer_token()
+        if token:
+            kwargs["cookies"] = [
+                {"name": "accessToken", "value": token, "url": FINANCAS_ORIGIN}
+            ]
+    if site == "carteira":
+        token = load_carteira_token()
+        if token:
+            def setup_carteira_page(page: Any) -> None:
+                def add_authorization(route: Any) -> None:
+                    headers = dict(route.request.headers)
+                    headers["authorization"] = f"Bearer {token}"
+                    route.continue_(headers=headers)
+
+                page.route("**/ferramentas-backend.auvp.com.br/**", add_authorization)
+
+            kwargs["page_setup"] = setup_carteira_page
     return kwargs
 
 
@@ -284,6 +303,8 @@ def discover_page(site: str, path: str) -> Path:
         summary = summarize_response(resp)
         resp_url = summary.get("url", "")
         if host_filter not in resp_url:
+            continue
+        if str(summary.get("path", "")).startswith("/cdn-cgi/"):
             continue
         key = f"{summary.get('status')} {summary.get('path')} {summary.get('query')}"
         if key in seen:
@@ -484,6 +505,7 @@ def discover_analitica_all() -> Path:
         "/api/codes": "code=PETR4",
         "/api/codes/ranked-by-rating": "rating_type=blue&limit=5&page=1&type=stock",
         "/api/assets-config": "companyType=BRA:stock&countryType=BRA",
+        "/api/credit-portfolio": "companyId=340&report=indexador&period=5Y&aggregate=ANUAL",
         "/api/search": "q=petr",
         "/api/search/codes": "q=petr",
         "/api/companies/search": "q=petr",
@@ -587,13 +609,129 @@ def discover_comunidade_all() -> Path:
     return out
 
 
+def discover_read_only_product_all(
+    site: str,
+    page_routes: list[str],
+    probe_paths: list[tuple[str, str | None]],
+) -> Path:
+    """Captura XHR e executa somente probes GET, sem persistir corpos."""
+    all_xhr: dict[str, dict[str, Any]] = {}
+    failures: list[dict[str, str]] = []
+    for route in page_routes:
+        print(f"XHR {site} {route}...", flush=True)
+        try:
+            out = discover_page(site, route)
+            report = json.loads(out.read_text(encoding="utf-8"))
+            for entry in report.get("endpoints", []):
+                key = f"{entry.get('status')} {entry.get('path')} {entry.get('query')}"
+                if key not in all_xhr:
+                    all_xhr[key] = {**entry, "fromPages": [route]}
+                elif route not in all_xhr[key]["fromPages"]:
+                    all_xhr[key]["fromPages"].append(route)
+        except Exception as exc:
+            failures.append({"stage": "xhr", "route": route, "error": type(exc).__name__})
+
+    probes: list[dict[str, Any]] = []
+    for path, query in probe_paths:
+        print(f"Probe GET {site} {path}...", flush=True)
+        try:
+            out = probe_endpoint(site, "GET", path, query)
+            report = json.loads(out.read_text(encoding="utf-8"))
+            probes.append(report.get("result", {}))
+        except Exception as exc:
+            failures.append({"stage": "probe", "route": path, "error": type(exc).__name__})
+
+    payload = {
+        "kind": f"{site}_full_discovery",
+        "product": site,
+        "capturedAt": datetime.now(timezone.utc).isoformat(),
+        "xhrEndpoints": list(all_xhr.values()),
+        "probes": probes,
+        "failures": failures,
+    }
+    out = write_report(f"{site}-full", payload)
+    print(out, flush=True)
+    return out
+
+
+def discover_carteira_all() -> Path:
+    return discover_read_only_product_all(
+        "carteira", CARTEIRA_PAGE_ROUTES, CARTEIRA_PROBE_PATHS
+    )
+
+
+def discover_dicionario_all() -> Path:
+    return discover_read_only_product_all(
+        "dicionario", DICIONARIO_PAGE_ROUTES, DICIONARIO_PROBE_PATHS
+    )
+
+
+def discover_everything() -> Path:
+    reports: list[dict[str, Any]] = []
+    runners = [
+        ("financas", discover_financas_all),
+        ("analitica", discover_analitica_all),
+        ("comunidade", discover_comunidade_all),
+        ("carteira", discover_carteira_all),
+        ("dicionario", discover_dicionario_all),
+    ]
+    for product, runner in runners:
+        try:
+            path = runner()
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            reports.append({
+                "product": product,
+                "report": path.name,
+                "xhrEndpointCount": len(payload.get("xhrEndpoints", [])),
+                "probeCount": len(payload.get("probes", [])),
+                "failureCount": len(payload.get("failures", [])),
+            })
+        except Exception as exc:
+            reports.append({"product": product, "error": type(exc).__name__})
+    return write_report("all-full", {
+        "kind": "all_products_discovery",
+        "capturedAt": datetime.now(timezone.utc).isoformat(),
+        "writeRequestsExecuted": False,
+        "products": reports,
+    })
+
+
+def summarize_latest_reports() -> Path:
+    products: list[dict[str, Any]] = []
+    for product in ("financas", "analitica", "comunidade", "carteira", "dicionario"):
+        matches = sorted(OUTPUT_DIR.glob(f"{product}-full-*.json"), reverse=True)
+        if not matches:
+            products.append({"product": product, "report": None})
+            continue
+        path = matches[0]
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        statuses: dict[str, int] = {}
+        for probe in payload.get("probes", []):
+            status = str(probe.get("status", "error"))
+            statuses[status] = statuses.get(status, 0) + 1
+        products.append({
+            "product": product,
+            "report": path.name,
+            "xhrEndpointCount": len(payload.get("xhrEndpoints", [])),
+            "probeCount": len(payload.get("probes", [])),
+            "probeStatuses": statuses,
+            "failureCount": len(payload.get("failures", [])),
+        })
+    return write_report("all-summary", {
+        "kind": "latest_products_summary",
+        "capturedAt": datetime.now(timezone.utc).isoformat(),
+        "writeRequestsExecuted": False,
+        "products": products,
+    })
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Descobre endpoints AUVP (Finanças, Analítica, Comunidade) para o MCP."
+        description="Descobre endpoints AUVP (Finanças, Analítica, Comunidade, Carteira e Dicionário) para o MCP."
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    for site in ("financas", "analitica", "comunidade"):
+    for site in ("financas", "analitica", "comunidade", "carteira", "dicionario"):
         cmd = sub.add_parser(site, help=f"Captura XHR ao abrir página ({site})")
         cmd.add_argument("--path", default="/", help="Rota da página")
 
@@ -611,6 +749,10 @@ def build_parser() -> argparse.ArgumentParser:
         "financas-all",
         help="XHR em todas as páginas Finanças + probe REST + scan JS",
     )
+    sub.add_parser("carteira-all", help="XHR e probes GET da Carteira")
+    sub.add_parser("dicionario-all", help="XHR e probes GET do Dicionário")
+    sub.add_parser("all", help="Varredura completa e somente leitura dos cinco módulos")
+    sub.add_parser("summary", help="Resume os relatórios completos mais recentes")
     sub.add_parser(
         "analitica-all",
         help="XHR em páginas Analítica + probe REST + scan JS",
@@ -636,6 +778,16 @@ def main() -> int:
             discover_analitica_all()
         elif args.command == "comunidade-all":
             discover_comunidade_all()
+        elif args.command == "carteira-all":
+            discover_carteira_all()
+        elif args.command == "dicionario-all":
+            discover_dicionario_all()
+        elif args.command == "all":
+            out = discover_everything()
+            print(out, flush=True)
+        elif args.command == "summary":
+            out = summarize_latest_reports()
+            print(out, flush=True)
         else:
             return 1
     except Exception as exc:

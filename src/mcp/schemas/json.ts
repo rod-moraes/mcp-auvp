@@ -191,6 +191,18 @@ export const analiticaMostViewedInputSchema: InputSchema = {
   },
 };
 
+export const analiticaCreditPortfolioInputSchema: InputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["companyId", "report"],
+  properties: {
+    companyId: { type: "integer", minimum: 1 },
+    report: { type: "string", enum: ["indexador", "region", "pf_pj"] },
+    period: { type: "string", minLength: 1, default: "5Y" },
+    aggregate: { type: "string", minLength: 1, default: "ANUAL" },
+  },
+};
+
 export const analiticaRankCodesByRatingInputSchema: InputSchema = {
   type: "object",
   additionalProperties: false,

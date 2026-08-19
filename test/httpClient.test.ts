@@ -123,6 +123,53 @@ describe("AuvpFinancasClient", () => {
     );
   });
 
+  it("sends the dedicated Carteira token only to the Carteira backend", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ ok: true }));
+    const client = new AuvpFinancasClient({
+      fetchImpl,
+      carteiraBaseUrl: "https://carteira-api.example.test",
+      carteiraOrigin: "https://carteira.example.test",
+      extraHeaders: {},
+    });
+    client.setBearerToken("financas-token");
+    client.setCarteiraToken("carteira-token");
+
+    await client.getCarteira("/auth/me");
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      new URL("https://carteira-api.example.test/auth/me"),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          origin: "https://carteira.example.test",
+          authorization: "Bearer carteira-token",
+        }),
+      }),
+    );
+  });
+
+  it("uses Comunidade origin headers without credentials for Dicionário", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ terms: [] }));
+    const client = new AuvpFinancasClient({
+      fetchImpl,
+      comunidadeOrigin: "https://comunidade.example.test",
+      dicionarioBaseUrl: "https://dicionario.example.test",
+      extraHeaders: {},
+    });
+    client.setBearerToken("must-not-leak");
+    client.setComunidadeCookieHeader("ips4_login_key=must-not-leak");
+
+    await client.getDicionario("/dictionary", { page: 1 });
+    const headers = vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers as Record<string, string>;
+    expect(fetchImpl).toHaveBeenCalledWith(
+      new URL("https://dicionario.example.test/dictionary?page=1"),
+      expect.anything(),
+    );
+    expect(headers.origin).toBe("https://comunidade.example.test");
+    expect(headers.referer).toContain("dicion%C3%A1rio");
+    expect(headers.authorization).toBeUndefined();
+    expect(headers.cookie).toBeUndefined();
+  });
+
   it("returns raw text for Analitica page route requests", async () => {
     const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
       new Response("rsc-payload", {
@@ -180,6 +227,7 @@ describe("AuvpFinancasClient", () => {
       hasSessionCookie: true,
       hasAnaliticaCookie: false,
       hasComunidadeCookie: false,
+      hasCarteiraToken: false,
       cookieNames: ["auvp_session"],
     });
     expect(fetchImpl).toHaveBeenLastCalledWith(

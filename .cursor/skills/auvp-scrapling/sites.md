@@ -1,6 +1,6 @@
 # Sites AUVP — descoberta de endpoints (MCP)
 
-Mesma lógica para **Finanças**, **Analítica** e **Comunidade**: mapear rotas HTTP, não extrair conteúdo.
+Mesma lógica para **Finanças**, **Analítica**, **Comunidade**, **Carteira** e **Dicionário**: mapear rotas HTTP, não extrair conteúdo.
 
 ## Visão comparativa
 

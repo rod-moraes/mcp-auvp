@@ -6,9 +6,11 @@ Servidor MCP local para consultar os produtos AUVP via chat (Cursor, Claude Desk
 
 | Produto | Base | Documentação |
 |---------|------|--------------|
-| **Finanças** | `https://financas-api.auvp.com.br` | **[src/financas/README.md](src/financas/README.md)** — 32 tools (contas, transações, dashboard, orçamento) |
-| **Analítica** | `https://analitica.auvp.com.br` | **[src/analitica/README.md](src/analitica/README.md)** — 44 tools (rankings, fundamentos, mercado, comparador) |
-| **Comunidade** | `https://comunidade.auvp.com.br` | **[src/comunidade/README.md](src/comunidade/README.md)** — 8 tools (busca, fóruns, tópicos, notificações, rankings) |
+| **Finanças** | `https://financas-api.auvp.com.br` | **[src/financas/README.md](src/financas/README.md)** — contas, transações, dashboard e orçamento |
+| **Analítica** | `https://analitica.auvp.com.br` | **[src/analitica/README.md](src/analitica/README.md)** — rankings, fundamentos, mercado e comparador |
+| **Comunidade** | `https://comunidade.auvp.com.br` | **[src/comunidade/README.md](src/comunidade/README.md)** — busca, fóruns, tópicos, notificações e rankings |
+| **Carteira** | `https://ferramentas-backend.auvp.com.br` | **[src/carteira/README.md](src/carteira/README.md)** — Diagrama do Cerrado, ativos, metas, aportes, perguntas e mapa |
+| **Dicionário** | `https://worker.auvp.com.br` | **[src/dicionario/README.md](src/dicionario/README.md)** — pesquisa e leitura sanitizada de termos |
 
 O servidor usa transporte `stdio` e pode ser instalado direto do GitHub com `npx`, sem clonar o repositório.
 
@@ -36,6 +38,21 @@ Crie ou edite `~/.cursor/mcp.json` (global) ou `.cursor/mcp.json` (só neste pro
   }
 }
 ```
+
+Por padrão, os cinco módulos são carregados. Para selecionar apenas alguns, adicione `--modules`:
+
+```json
+{
+  "mcpServers": {
+    "mcp-auvp": {
+      "command": "npx",
+      "args": ["-y", "github:rod-moraes/mcp-auvp", "--modules", "financas,carteira"]
+    }
+  }
+}
+```
+
+Também é possível usar `AUVP_MODULES=financas,carteira`. A flag prevalece; ausência ou valor vazio seleciona todos. As tools de autenticação permanecem disponíveis em qualquer seleção.
 
 Token e cookies são salvos automaticamente em `~/.auvp-financas/` — não é preciso configurar `env` no `mcp.json`.
 
@@ -67,9 +84,12 @@ No chat do Cursor, peça ao agente:
 
 O MCP:
 
-1. Reutiliza o token salvo se ainda for válido.
-2. Tenta renovar em silêncio com o perfil do navegador salvo.
-3. Só abre o Chrome visível se o login ainda for necessário.
+1. Valida somente os módulos selecionados.
+2. Reutiliza tokens e cookies salvos quando ainda são válidos.
+3. Tenta renovar em silêncio com o perfil do navegador salvo.
+4. Só abre o Chrome visível se o login ainda for necessário.
+
+Um lock em `~/.auvp-financas/auth-login.lock` impede que dois chats abram janelas de login ao mesmo tempo; as outras instâncias aguardam e recarregam as credenciais persistidas.
 
 Na primeira vez (ou sessão expirada), o navegador abre para você logar no SSO. Depois disso, a renovação costuma ser automática.
 
@@ -107,6 +127,7 @@ Confirme o status com `auvp_get_auth_status`.
 | `~/.auvp-financas/access-token` | Bearer token da API Finanças |
 | `~/.auvp-financas/analitica-cookie` | Cookie de sessão do Analítica |
 | `~/.auvp-financas/comunidade-cookie` | Cookie de sessão IPS da Comunidade |
+| `~/.auvp-financas/carteira-token` | Bearer da Carteira/Diagrama do Cerrado |
 | `~/.auvp-financas/browser-profile/` | Perfil Playwright (sessão SSO no navegador) |
 | `~/.auvp-financas/storage-state.json` | Backup extra de cookies |
 
@@ -189,6 +210,11 @@ Alternativa inline (sem arquivo): `AUVP_FINANCAS_ACCESS_TOKEN`, `AUVP_ANALITICA_
 | `AUVP_FINANCAS_STORAGE_STATE_FILE` | `~/.auvp-financas/storage-state.json` | Backup de sessão |
 | `AUVP_FINANCAS_LOGIN_FRESH` | — | `1` força login do zero |
 | `AUVP_FINANCAS_AUTO_LOGIN_ON_START` | `1` | `0` desativa login automático ao iniciar |
+| `AUVP_FINANCAS_FORCE_LOGIN_ON_START` | `0` | `1` força navegador visível no startup |
+| `AUVP_MODULES` | todos | `financas,analitica,comunidade,carteira,dicionario` |
+| `AUVP_CARTEIRA_BASE_URL` | `https://ferramentas-backend.auvp.com.br` | API da Carteira |
+| `AUVP_CARTEIRA_ACCESS_TOKEN_FILE` | `~/.auvp-financas/carteira-token` | Token da Carteira |
+| `AUVP_DICIONARIO_BASE_URL` | `https://worker.auvp.com.br` | API do Dicionário |
 | `AUVP_FINANCAS_EXTRA_HEADERS` | — | JSON com headers extras |
 
 SSO (opcional):
@@ -232,6 +258,18 @@ Documentação: **[src/comunidade/README.md](src/comunidade/README.md)**
 
 Busca, listagem de fóruns/tópicos, leitura de posts e comentários, notificações e rankings IPS. Somente leitura. Varredura: `npm run scan:comunidade`.
 
+### Carteira — `auvp_carteira_*`
+
+Documentação: **[src/carteira/README.md](src/carteira/README.md)**
+
+Leitura e escrita do Diagrama do Cerrado. O scan padrão não executa operações mutáveis.
+
+### Dicionário — `auvp_dicionario_*`
+
+Documentação: **[src/dicionario/README.md](src/dicionario/README.md)**
+
+Pesquisa e leitura sanitizada. Somente leitura.
+
 ---
 
 ## Fluxo SSO manual (alternativa)
@@ -256,14 +294,21 @@ npm run build
 npm run scan:financas    # requer auth
 npm run scan:analitica   # requer auth (bearer + cookie)
 npm run scan:comunidade  # requer cookie IPS
+npm run scan:carteira    # requer token; somente leitura
+npm run scan:dicionario  # público; somente leitura
+npm run discover:all     # discovery GET/XHR dos cinco módulos
 ```
+
+`scan:financas` também é somente leitura por padrão. O ciclo de criação e remoção de dados só roda com `AUVP_SCAN_ALLOW_WRITES=1`.
 
 ---
 
 ## Origem do catálogo
 
-Contrato inicial extraído de HARs e probes Scrapling nos três produtos. Novas rotas podem ser descobertas com o skill [auvp-scrapling](.cursor/skills/auvp-scrapling/SKILL.md) — ver READMEs de cada módulo:
+Contrato extraído de HARs, bundles e probes Scrapling nos cinco módulos. Novas rotas podem ser descobertas com o skill [auvp-scrapling](.cursor/skills/auvp-scrapling/SKILL.md) — ver READMEs de cada módulo:
 
 - [Finanças](src/financas/README.md)
 - [Analítica](src/analitica/README.md)
 - [Comunidade](src/comunidade/README.md)
+- [Carteira](src/carteira/README.md)
+- [Dicionário](src/dicionario/README.md)

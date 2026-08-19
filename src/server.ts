@@ -7,10 +7,19 @@ import {
 import { loadPersistedAnaliticaCookieHeader } from "./analitica/cookies.js";
 import { loadPersistedComunidadeCookieHeader } from "./comunidade/cookies.js";
 import { loadPersistedBearerToken } from "./auth/storage.js";
+import { loadPersistedCarteiraToken } from "./carteira/auth.js";
 import { bootstrapAuthOnStartup } from "./auth/ensure-auth.js";
 import { AuvpFinancasClient } from "./core/http-client.js";
 import { MCP_GITHUB_REPOSITORY } from "./core/project.js";
 import { callAuvpTool, listAuvpTools } from "./mcp/registry.js";
+import {
+  ALL_AUVP_MODULES,
+  type AuvpModule,
+} from "./mcp/modules.js";
+
+export interface AuvpServerOptions {
+  enabledModules?: readonly AuvpModule[];
+}
 
 export function createAuvpFinancasClient(): AuvpFinancasClient {
   const client = new AuvpFinancasClient();
@@ -30,10 +39,19 @@ export function createAuvpFinancasClient(): AuvpFinancasClient {
     client.setComunidadeCookieHeader(comunidadeCookie);
   }
 
+  const carteiraToken = loadPersistedCarteiraToken();
+  if (carteiraToken) {
+    client.setCarteiraToken(carteiraToken);
+  }
+
   return client;
 }
 
-export function createServer(client = createAuvpFinancasClient()): Server {
+export function createServer(
+  client = createAuvpFinancasClient(),
+  options: AuvpServerOptions = {},
+): Server {
+  const enabledModules = options.enabledModules ?? ALL_AUVP_MODULES;
   const server = new Server(
     {
       name: "mcp-auvp",
@@ -43,12 +61,12 @@ export function createServer(client = createAuvpFinancasClient()): Server {
       capabilities: {
         tools: {},
       },
-      instructions: `MCP AUVP — Finanças, Analítica e Comunidade. Repositório: ${MCP_GITHUB_REPOSITORY}. Auth: auvp_ensure_auth.`,
+      instructions: `MCP AUVP — módulos ativos: ${enabledModules.join(", ")}. Repositório: ${MCP_GITHUB_REPOSITORY}. Auth: auvp_ensure_auth.`,
     },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: listAuvpTools(),
+    tools: listAuvpTools(enabledModules),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) =>
@@ -56,19 +74,23 @@ export function createServer(client = createAuvpFinancasClient()): Server {
       client,
       request.params.name,
       request.params.arguments ?? {},
+      enabledModules,
     ),
   );
 
   return server;
 }
 
-export async function runStdioServer(): Promise<void> {
+export async function runStdioServer(
+  options: AuvpServerOptions = {},
+): Promise<void> {
+  const enabledModules = options.enabledModules ?? ALL_AUVP_MODULES;
   const client = createAuvpFinancasClient();
   const transport = new StdioServerTransport();
-  const server = createServer(client);
+  const server = createServer(client, { enabledModules });
   await server.connect(transport);
 
-  void bootstrapAuthOnStartup(client).catch((error) => {
+  void bootstrapAuthOnStartup(client, process.env, enabledModules).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(
       `[mcp-auvp] Falha ao autenticar na inicialização: ${message}`,

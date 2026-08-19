@@ -9,32 +9,32 @@ import {
   syncComunidadeCookieFromDisk,
 } from "../comunidade/cookies.js";
 import {
+  getCarteiraTokenFilePath,
+  loadPersistedCarteiraToken,
+  syncCarteiraTokenFromDisk,
+} from "../carteira/auth.js";
+import { AuvpApiError } from "../core/errors.js";
+import type { AuvpFinancasClient } from "../core/http-client.js";
+import { ALL_AUVP_MODULES, type AuvpModule } from "../mcp/modules.js";
+import { runBrowserLogin } from "./browser-login.js";
+import { acquireAuthLoginLock } from "./login-lock.js";
+import {
   getTokenFilePath,
   isBearerTokenExpired,
   loadPersistedBearerToken,
-  persistBearerToken,
 } from "./storage.js";
-import {
-  refreshSecondarySiteCookies,
-  runBrowserLogin,
-} from "./browser-login.js";
-import { AuvpApiError } from "../core/errors.js";
-import type { AuvpFinancasClient } from "../core/http-client.js";
 
 export interface EnsureAuthOptions {
   fresh?: boolean;
   forceBrowser?: boolean;
   interactive?: boolean;
   skipSilent?: boolean;
+  modules?: readonly AuvpModule[];
 }
 
 export interface EnsureAuthResult {
   status: "authenticated" | "login_required" | "failed";
-  method:
-    | "existing_token"
-    | "silent_browser"
-    | "interactive_browser"
-    | "none";
+  method: "existing_token" | "silent_browser" | "interactive_browser" | "none";
   tokenPersisted: boolean;
   tokenFile?: string;
   profileDir?: string;
@@ -42,168 +42,56 @@ export interface EnsureAuthResult {
   analiticaCookieFile?: string;
   comunidadeCookieCaptured?: boolean;
   comunidadeCookieFile?: string;
+  carteiraTokenCaptured?: boolean;
+  carteiraTokenFile?: string;
   authStatus: ReturnType<AuvpFinancasClient["getAuthStatus"]>;
   message?: string;
 }
 
-function applyPersistedAuthToClient(client: AuvpFinancasClient): void {
+export function applyPersistedAuthToClient(client: AuvpFinancasClient): void {
   syncAnaliticaCookieFromDisk(client);
   syncComunidadeCookieFromDisk(client);
+  syncCarteiraTokenFromDisk(client);
   const token = loadPersistedBearerToken();
-  if (token) {
-    client.setBearerToken(token);
-  }
+  if (token) client.setBearerToken(token);
 }
 
-function hasFullAuthentication(client: AuvpFinancasClient): boolean {
-  const authStatus = client.getAuthStatus();
-  return (
-    authStatus.hasBearerToken &&
-    authStatus.hasAnaliticaCookie &&
-    authStatus.hasComunidadeCookie
-  );
-}
-
-function buildMissingAuthMessage(client: AuvpFinancasClient): string {
-  const authStatus = client.getAuthStatus();
-  const missing: string[] = [];
-
-  if (!authStatus.hasBearerToken) {
-    missing.push("Finanças");
-  }
-  if (!authStatus.hasAnaliticaCookie) {
-    missing.push("Analítica");
-  }
-  if (!authStatus.hasComunidadeCookie) {
-    missing.push("Comunidade");
-  }
-
-  return `Autenticação incompleta. Falta: ${missing.join(", ")}.`;
-}
-
-function buildFullAuthMessage(): string {
-  return "Token do Finanças e cookies do Analítica e da Comunidade estão válidos.";
-}
-
-type AuthResultBase = Omit<EnsureAuthResult, "status" | "message" | "authStatus">;
-
-function finalizeAuthResult(
+export function hasRequiredAuthMaterial(
   client: AuvpFinancasClient,
-  base: AuthResultBase & {
-    successMessage?: string;
-    pendingMessage?: string;
-    isInteractivePending?: boolean;
-  },
-): EnsureAuthResult {
-  const authStatus = client.getAuthStatus();
-
-  if (hasFullAuthentication(client)) {
-    return withAnaliticaCookieMetadata({
-      ...base,
-      status: "authenticated",
-      authStatus,
-      message: base.successMessage ?? buildFullAuthMessage(),
-    });
-  }
-
-  if (base.isInteractivePending) {
-    return withAnaliticaCookieMetadata({
-      ...base,
-      status: "login_required",
-      authStatus,
-      message: base.pendingMessage ?? buildMissingAuthMessage(client),
-    });
-  }
-
-  return withAnaliticaCookieMetadata({
-    ...base,
-    status: "failed",
-    authStatus,
-    message: buildMissingAuthMessage(client),
+  modules: readonly AuvpModule[],
+): boolean {
+  const status = client.getAuthStatus();
+  const token = loadPersistedBearerToken();
+  return modules.every((moduleName) => {
+    if (moduleName === "financas") {
+      return status.hasBearerToken && (!token || isBearerTokenExpired(token) !== true);
+    }
+    if (moduleName === "analitica") return status.hasAnaliticaCookie;
+    if (moduleName === "comunidade") return status.hasComunidadeCookie;
+    if (moduleName === "carteira") return status.hasCarteiraToken;
+    return true;
   });
 }
 
-function needsSecondarySiteCookies(
+export async function validateSelectedAuthentication(
   client: AuvpFinancasClient,
-): boolean {
-  const authStatus = client.getAuthStatus();
-  return !authStatus.hasAnaliticaCookie || !authStatus.hasComunidadeCookie;
-}
-
-interface SecondarySiteCookiesResult {
-  status: "complete" | "interactive_pending" | "missing";
-  openedInteractiveBrowser: boolean;
-}
-
-async function ensureSecondarySiteCookies(
-  client: AuvpFinancasClient,
-  options: { interactive?: boolean } = {},
-): Promise<SecondarySiteCookiesResult> {
-  if (!needsSecondarySiteCookies(client)) {
-    return { status: "complete", openedInteractiveBrowser: false };
-  }
-
-  if (!options.interactive) {
-    await refreshSecondarySiteCookies({ headless: true });
-    applyPersistedAuthToClient(client);
-    if (!needsSecondarySiteCookies(client)) {
-      return { status: "complete", openedInteractiveBrowser: false };
-    }
-
-    return { status: "missing", openedInteractiveBrowser: false };
-  }
-
-  console.error(
-    "[mcp-auvp] Cookie do Analítica ou da Comunidade ausente — abrindo navegador visível…",
-  );
-  await refreshSecondarySiteCookies({ headless: false });
-  applyPersistedAuthToClient(client);
-
-  if (needsSecondarySiteCookies(client)) {
-    return { status: "interactive_pending", openedInteractiveBrowser: true };
-  }
-
-  return { status: "complete", openedInteractiveBrowser: true };
-}
-
-function withAnaliticaCookieMetadata<T extends EnsureAuthResult>(result: T): T {
-  return {
-    ...result,
-    analiticaCookieCaptured: Boolean(loadPersistedAnaliticaCookieHeader()),
-    analiticaCookieFile: getAnaliticaCookieFilePath(),
-    comunidadeCookieCaptured: Boolean(loadPersistedComunidadeCookieHeader()),
-    comunidadeCookieFile: getComunidadeCookieFilePath(),
-  };
-}
-
-async function validateTokenWithApi(
-  client: AuvpFinancasClient,
+  modules: readonly AuvpModule[],
 ): Promise<boolean> {
-  try {
-    await client.get("/users/profile");
-    return true;
-  } catch (error) {
-    if (error instanceof AuvpApiError && error.status === 401) {
-      return false;
-    }
-    throw error;
-  }
-}
+  if (!hasRequiredAuthMaterial(client, modules)) return false;
 
-function hasUsableToken(client: AuvpFinancasClient): boolean {
-  const authStatus = client.getAuthStatus();
-  if (!authStatus.hasBearerToken && !authStatus.hasSessionCookie) {
-    return false;
-  }
-
-  const token = loadPersistedBearerToken();
-  if (token) {
-    const expired = isBearerTokenExpired(token);
-    if (expired === true) {
-      return false;
+  for (const moduleName of modules) {
+    try {
+      if (moduleName === "financas") await client.get("/users/profile");
+      else if (moduleName === "analitica") await client.getAnalitica("/api/session");
+      else if (moduleName === "comunidade") await client.getComunidadeText("/");
+      else if (moduleName === "carteira") await client.getCarteira("/auth/me");
+    } catch (error) {
+      if (error instanceof AuvpApiError && [401, 403].includes(error.status ?? 0)) {
+        return false;
+      }
+      throw error;
     }
   }
-
   return true;
 }
 
@@ -215,200 +103,132 @@ export async function ensureAuth(
   const forceBrowser = options.forceBrowser ?? false;
   const interactive = options.interactive ?? true;
   const skipSilent = options.skipSilent ?? false;
+  const modules = options.modules ?? ALL_AUVP_MODULES;
+  applyPersistedAuthToClient(client);
 
-  if (!forceBrowser && !fresh && hasUsableToken(client)) {
-    if (await validateTokenWithApi(client)) {
-      const secondaryStatus = await ensureSecondarySiteCookies(client, {
-        interactive,
-      });
-
-      return finalizeAuthResult(client, {
-        method: secondaryStatus.openedInteractiveBrowser
-          ? "interactive_browser"
-          : "existing_token",
-        tokenPersisted: Boolean(loadPersistedBearerToken()),
-        tokenFile: getTokenFilePath(),
-        isInteractivePending: secondaryStatus.status === "interactive_pending",
-        pendingMessage:
-          "Navegador aberto — conclua o login no Finanças, Analítica e Comunidade e chame auvp_ensure_auth novamente.",
-      });
-    }
+  if (!forceBrowser && !fresh && (await validateSelectedAuthentication(client, modules))) {
+    return buildResult(client, "authenticated", "existing_token",
+      "As credenciais salvas dos módulos selecionados continuam válidas.");
   }
 
   if (!fresh && !skipSilent) {
-    const silentResult = await runBrowserLogin({
-      headless: true,
-      waitTimeoutMs: 25_000,
-    });
-
+    const silentResult = await runBrowserLogin({ headless: true, waitTimeoutMs: 25_000, modules });
     if (silentResult) {
       applyPersistedAuthToClient(client);
-      if (await validateTokenWithApi(client)) {
-        return finalizeAuthResult(client, {
-          method: "silent_browser",
-          tokenPersisted: true,
-          tokenFile: silentResult.tokenFile,
-          profileDir: silentResult.profileDir,
-          analiticaCookieCaptured: silentResult.analiticaCookieCaptured,
-          analiticaCookieFile: silentResult.analiticaCookieFile,
-          comunidadeCookieCaptured: silentResult.comunidadeCookieCaptured,
-          comunidadeCookieFile: silentResult.comunidadeCookieFile,
-          successMessage:
-            "Token renovado automaticamente com a sessão salva do navegador.",
-        });
+      if (await validateSelectedAuthentication(client, modules)) {
+        return buildResult(client, "authenticated", "silent_browser",
+          "Sessão renovada silenciosamente com o perfil salvo.", silentResult.profileDir);
       }
     }
   }
 
   if (!interactive) {
-    return withAnaliticaCookieMetadata({
-      status: "login_required",
-      method: "none",
-      tokenPersisted: false,
-      authStatus: client.getAuthStatus(),
-      message:
-        "Autenticação necessária. Chame auvp_ensure_auth com interactive=true para abrir o navegador.",
-    });
+    return buildResult(client, "login_required", "none",
+      "Autenticação necessária. Chame auvp_ensure_auth com interactive=true.");
   }
 
-  const interactiveResult = await runBrowserLogin({
-    fresh,
-    headless: false,
-    waitTimeoutMs: 10 * 60_000,
-  });
-
-  if (!interactiveResult) {
-    return withAnaliticaCookieMetadata({
-      status: "login_required",
-      method: "none",
-      tokenPersisted: false,
-      authStatus: client.getAuthStatus(),
-      message:
-        "Login ainda pendente. A janela do navegador foi mantida aberta — conclua o SSO e chame auvp_ensure_auth novamente.",
-    });
+  const lock = await acquireAuthLoginLock();
+  if (!lock) {
+    applyPersistedAuthToClient(client);
+    if (await validateSelectedAuthentication(client, modules)) {
+      return buildResult(client, "authenticated", "existing_token",
+        "Outra instância concluiu o login e as credenciais foram reutilizadas.");
+    }
+    return buildResult(client, "login_required", "none",
+      "Outra instância está realizando o login. Tente novamente quando ela concluir.");
   }
 
-  applyPersistedAuthToClient(client);
+  try {
+    applyPersistedAuthToClient(client);
+    if (!forceBrowser && !fresh && (await validateSelectedAuthentication(client, modules))) {
+      return buildResult(client, "authenticated", "existing_token",
+        "Outra instância já atualizou as credenciais salvas.");
+    }
 
-  if (!(await validateTokenWithApi(client))) {
-    return withAnaliticaCookieMetadata({
-      status: "failed",
-      method: "interactive_browser",
-      tokenPersisted: true,
-      tokenFile: interactiveResult.tokenFile,
-      profileDir: interactiveResult.profileDir,
-      analiticaCookieCaptured: interactiveResult.analiticaCookieCaptured,
-      analiticaCookieFile: interactiveResult.analiticaCookieFile,
-      comunidadeCookieCaptured: interactiveResult.comunidadeCookieCaptured,
-      comunidadeCookieFile: interactiveResult.comunidadeCookieFile,
-      authStatus: client.getAuthStatus(),
-      message:
-        "Token capturado, mas a API ainda respondeu 401. Tente auvp_ensure_auth com fresh=true.",
+    const interactiveResult = await runBrowserLogin({
+      fresh,
+      headless: false,
+      waitTimeoutMs: 10 * 60_000,
+      modules,
     });
-  }
+    if (!interactiveResult) {
+      return buildResult(client, "login_required", "interactive_browser",
+        "Login ainda pendente na janela aberta. Conclua o SSO e chame auvp_ensure_auth novamente.");
+    }
 
-  return finalizeAuthResult(client, {
-    method: "interactive_browser",
-    tokenPersisted: true,
-    tokenFile: interactiveResult.tokenFile,
-    profileDir: interactiveResult.profileDir,
-    analiticaCookieCaptured: interactiveResult.analiticaCookieCaptured,
-    analiticaCookieFile: interactiveResult.analiticaCookieFile,
-    comunidadeCookieCaptured: interactiveResult.comunidadeCookieCaptured,
-    comunidadeCookieFile: interactiveResult.comunidadeCookieFile,
-    successMessage:
-      "Login concluído e token/cookies do Finanças, Analítica e Comunidade salvos em disco.",
-  });
+    applyPersistedAuthToClient(client);
+    if (!(await validateSelectedAuthentication(client, modules))) {
+      return buildResult(client, "failed", "interactive_browser",
+        "As credenciais foram capturadas, mas algum módulo selecionado ainda recusou a sessão. Tente fresh=true.",
+        interactiveResult.profileDir);
+    }
+
+    return buildResult(client, "authenticated", "interactive_browser",
+      "Login concluído e credenciais dos módulos selecionados salvas.", interactiveResult.profileDir);
+  } finally {
+    lock.release();
+  }
 }
 
-export function shouldAutoLoginOnStart(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+function buildResult(
+  client: AuvpFinancasClient,
+  status: EnsureAuthResult["status"],
+  method: EnsureAuthResult["method"],
+  message: string,
+  profileDir?: string,
+): EnsureAuthResult {
+  return {
+    status,
+    method,
+    message,
+    profileDir,
+    tokenPersisted: Boolean(loadPersistedBearerToken()),
+    tokenFile: getTokenFilePath(),
+    analiticaCookieCaptured: Boolean(loadPersistedAnaliticaCookieHeader()),
+    analiticaCookieFile: getAnaliticaCookieFilePath(),
+    comunidadeCookieCaptured: Boolean(loadPersistedComunidadeCookieHeader()),
+    comunidadeCookieFile: getComunidadeCookieFilePath(),
+    carteiraTokenCaptured: Boolean(loadPersistedCarteiraToken()),
+    carteiraTokenFile: getCarteiraTokenFilePath(),
+    authStatus: client.getAuthStatus(),
+  };
+}
+
+export function shouldAutoLoginOnStart(env: NodeJS.ProcessEnv = process.env): boolean {
   const value = env.AUVP_FINANCAS_AUTO_LOGIN_ON_START?.trim().toLowerCase();
-  if (!value) {
-    return true;
-  }
-
-  return value !== "0" && value !== "false" && value !== "no";
+  return !value || !["0", "false", "no"].includes(value);
 }
 
-export function shouldForceLoginOnStart(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function shouldForceLoginOnStart(env: NodeJS.ProcessEnv = process.env): boolean {
   const value = env.AUVP_FINANCAS_FORCE_LOGIN_ON_START?.trim().toLowerCase();
-  if (!value) {
-    return true;
-  }
-
-  return value !== "0" && value !== "false" && value !== "no";
+  return Boolean(value && !["0", "false", "no"].includes(value));
 }
 
 export function getBootstrapAuthOptions(
   env: NodeJS.ProcessEnv = process.env,
+  modules: readonly AuvpModule[] = ALL_AUVP_MODULES,
 ): EnsureAuthOptions {
-  return {
-    interactive: true,
-    skipSilent: true,
-    forceBrowser: shouldForceLoginOnStart(env),
-  };
+  return { interactive: true, skipSilent: false, forceBrowser: shouldForceLoginOnStart(env), modules };
 }
 
 export async function bootstrapAuthOnStartup(
   client: AuvpFinancasClient,
   env: NodeJS.ProcessEnv = process.env,
+  modules: readonly AuvpModule[] = ALL_AUVP_MODULES,
 ): Promise<EnsureAuthResult | undefined> {
-  if (!shouldAutoLoginOnStart(env)) {
-    return undefined;
-  }
-
-  const bootstrapOptions = getBootstrapAuthOptions(env);
-  if (bootstrapOptions.forceBrowser) {
-    console.error(
-      "[mcp-auvp] Inicialização do MCP — abrindo navegador para renovar login do Finanças, Analítica e Comunidade…",
-    );
-  } else {
-    console.error(
-      "[mcp-auvp] Verificando autenticação na inicialização do MCP…",
-    );
-  }
-
-  const result = await ensureAuth(client, bootstrapOptions);
-
-  if (result.status === "authenticated") {
-    console.error(
-      `[mcp-auvp] Autenticado (${result.method}): ${result.message}`,
-    );
-  } else if (result.status === "login_required") {
-    console.error(
-      `[mcp-auvp] Login pendente (${result.method}): ${result.message ?? result.status}`,
-    );
-  } else if (result.status === "failed") {
-    console.error(
-      `[mcp-auvp] Autenticação incompleta (${result.method}): ${result.message ?? result.status}`,
-    );
-  } else {
-    console.error(`[mcp-auvp] ${result.message ?? result.status}`);
-  }
-
-  return result;
+  if (!shouldAutoLoginOnStart(env)) return undefined;
+  console.error("[mcp-auvp] Verificando autenticação salva na inicialização…");
+  const authResult = await ensureAuth(client, getBootstrapAuthOptions(env, modules));
+  console.error(`[mcp-auvp] Auth ${authResult.status} (${authResult.method}): ${authResult.message ?? ""}`);
+  return authResult;
 }
 
 export async function trySilentAuthRefresh(
   client: AuvpFinancasClient,
+  modules: readonly AuvpModule[] = ALL_AUVP_MODULES,
 ): Promise<boolean> {
-  const silentResult = await runBrowserLogin({
-    headless: true,
-    waitTimeoutMs: 25_000,
-  });
-
-  if (!silentResult) {
-    return false;
-  }
-
+  const silentResult = await runBrowserLogin({ headless: true, waitTimeoutMs: 25_000, modules });
+  if (!silentResult) return false;
   applyPersistedAuthToClient(client);
-  if (!(await validateTokenWithApi(client))) {
-    return false;
-  }
-
-  return hasFullAuthentication(client);
+  return validateSelectedAuthentication(client, modules);
 }

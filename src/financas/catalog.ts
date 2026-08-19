@@ -23,21 +23,12 @@ export const FINANCAS_ORIGIN = "https://financas.auvp.com.br";
 /** Rotas REST confirmadas na API (financas-api.auvp.com.br). */
 export const FINANCAS_API_ROUTES: readonly FinancasApiRoute[] = [
   { method: "GET", path: "/auth/redirect-url", queryKeys: ["provider"], description: "Inicia fluxo SSO OIDC (redirect 302)." },
-  {
-    method: "POST",
-    path: "/auth/validate-token",
-    description: "Valida JWT (body: { token }). Usado pelo frontend.",
-    note: "Probe vazio retorna 500; não expor como tool de escrita.",
-  },
-  {
-    method: "POST",
-    path: "/auth/refresh-token",
-    description: "Renova access_token (body: { token }). Usado pelo frontend.",
-    note: "Probe vazio retorna 500; renovação via auvp_ensure_auth no MCP.",
-  },
+  { method: "GET", path: "/access/status", description: "Status de acesso/plano do usuário atual." },
+  { method: "GET", path: "/feature-flags/me", description: "Feature flags habilitadas para o usuário." },
   { method: "GET", path: "/users/profile", description: "Perfil do usuário logado." },
   { method: "GET", path: "/users", description: "Dados do usuário.", note: "403 em planos sem permissão." },
   { method: "GET", path: "/accounts", description: "Lista contas; inclui accountsSummary agregado." },
+  { method: "GET", path: "/accounts/hidden", description: "Lista contas ocultas." },
   { method: "GET", path: "/accounts/lastTransactions", description: "Últimas transações por conta." },
   { method: "GET", path: "/accounts/:accountId", description: "Detalhe de uma conta." },
   { method: "POST", path: "/accounts/manual", write: true, description: "Cria conta manual." },
@@ -64,13 +55,12 @@ export const FINANCAS_API_ROUTES: readonly FinancasApiRoute[] = [
   { method: "PATCH", path: "/budgets/:budgetId", write: true, description: "Atualiza meta de orçamento." },
   { method: "GET", path: "/categories", description: "Categorias de transação (catálogo Pluggy)." },
   { method: "GET", path: "/categories/tree", description: "Árvore de categorias.", note: "403 em planos sem permissão." },
-  { method: "GET", path: "/user-categories", description: "Categorias personalizadas do usuário." },
   {
     method: "POST",
     path: "/categories",
     write: true,
     description: "Cria categoria do catálogo Pluggy (uso administrativo).",
-    note: "Categorias do usuário usam GET /user-categories; criação pode retornar 500/403.",
+    note: "Criação pode retornar 500/403 conforme o plano.",
   },
   { method: "DELETE", path: "/categories/:categoryId", write: true, description: "Remove categoria." },
   { method: "GET", path: "/tags", description: "Tags de transação." },
@@ -84,7 +74,9 @@ export const FINANCAS_API_ROUTES: readonly FinancasApiRoute[] = [
     description: "Faturas de cartão de crédito.",
     note: "404 quando a conta não é cartão ou não há faturas sincronizadas.",
   },
-  { method: "GET", path: "/bridge/status", description: "Status da ponte de sincronização bancária e plano." },
+  { method: "GET", path: "/bills", description: "Prefixo de faturas observado no bundle atual.", note: "Sem tool própria; detalhe validado em /bills/account/:accountId." },
+  { method: "POST", path: "/bills/admin/sync-all-users", write: true, description: "Sincronização administrativa observada no bundle.", note: "Não exposto como tool." },
+  { method: "POST", path: "/transactions/admin/resync-currencies", write: true, description: "Reprocessamento administrativo de moedas observado no bundle.", note: "Não exposto como tool." },
   { method: "POST", path: "/pluggy/connect-token", write: true, description: "Token para conectar banco via Pluggy (201)." },
 ];
 
@@ -102,8 +94,6 @@ export const FINANCAS_PAGE_ROUTES: readonly FinancasPageRoute[] = [
   { path: "/dashboard/tags", description: "Tags." },
   { path: "/pluggy/auth", description: "Fluxo OAuth Pluggy (página, não API)." },
   { path: "/settings/profile", description: "Perfil e configurações." },
-  { path: "/settings/categories", description: "Categorias." },
-  { path: "/settings/types", description: "Tipos de transação." },
 ];
 
 export function normalizeFinancasApiPath(pathname: string): string {

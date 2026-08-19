@@ -2,6 +2,7 @@ import type { AuvpFinancasClient } from "../core/http-client.js";
 import { callAuvpTool } from "../mcp/registry.js";
 import type { ToolResult } from "../mcp/tool-utils.js";
 import { comunidadeToolDefinitions } from "./tools.js";
+import { sanitizeReportError } from "../core/report-sanitizer.js";
 
 const SAMPLE_TOPIC_URL =
   "https://comunidade.auvp.com.br/topic/43093-empreender-agora-ou-esperar/";
@@ -73,7 +74,7 @@ async function runProbe(
       tool: probe.tool,
       ok: !isError,
       isError,
-      error: isError ? JSON.stringify(payload) : undefined,
+      error: isError ? sanitizeReportError(JSON.stringify(payload)) : undefined,
       durationMs: Date.now() - started,
     };
   } catch (error) {
@@ -81,7 +82,7 @@ async function runProbe(
       tool: probe.tool,
       ok: false,
       isError: true,
-      error: error instanceof Error ? error.message : String(error),
+      error: sanitizeReportError(error instanceof Error ? error.message : String(error)),
       durationMs: Date.now() - started,
     };
   }

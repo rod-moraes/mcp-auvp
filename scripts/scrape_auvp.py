@@ -23,6 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from auvp_auth import (  # noqa: E402
     ANALITICA_ORIGIN,
     COMUNIDADE_ORIGIN,
+    CARTEIRA_API,
+    DICIONARIO_API,
     FINANCAS_API,
     FINANCAS_ORIGIN,
     headers_for_site,
@@ -221,6 +223,50 @@ def scrape_financas_api(path: str, output: Path | None) -> Path:
     return out
 
 
+def scrape_api_contract(site: str, path: str, output: Path | None) -> Path:
+    """Registra apenas status e shape; nunca persiste o corpo autenticado."""
+    from scrapling.fetchers import Fetcher
+
+    base = {"carteira": CARTEIRA_API, "dicionario": DICIONARIO_API}[site]
+    url = urljoin(base, path if path.startswith("/") else f"/{path}")
+    page = Fetcher.get(
+        url,
+        headers=headers_for_site(site),  # type: ignore[arg-type]
+        impersonate="chrome",
+        stealthy_headers=True,
+    )
+    payload: dict[str, Any] = {
+        "site": site,
+        "method": "GET",
+        "url": url,
+        "status": page.status,
+        "capturedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        body = page.json()
+        if isinstance(body, dict):
+            payload["responseKeys"] = sorted(body.keys())
+            for key, value in body.items():
+                if isinstance(value, list):
+                    payload.setdefault("arrays", {})[key] = {
+                        "length": len(value),
+                        "itemKeys": sorted(value[0].keys())
+                        if value and isinstance(value[0], dict)
+                        else [],
+                    }
+        elif isinstance(body, list):
+            payload["responseType"] = "array"
+            payload["length"] = len(body)
+            payload["itemKeys"] = (
+                sorted(body[0].keys()) if body and isinstance(body[0], dict) else []
+            )
+    except Exception:
+        payload["bodyBytes"] = len(page.body or page.html_content or "")
+    out = output or default_output_path(f"{site}-contract", "json")
+    write_output(out, json.dumps(payload, indent=2, ensure_ascii=False))
+    return out
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Raspagem AUVP com Scrapling")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -252,6 +298,11 @@ def build_parser() -> argparse.ArgumentParser:
     financas_api.add_argument("path", help="Path da API, ex.: /users/profile")
     financas_api.add_argument("-o", "--output", type=Path)
 
+    for site in ("carteira", "dicionario"):
+        product = sub.add_parser(site, help=f"Contrato GET sanitizado ({site})")
+        product.add_argument("path", help="Path da API")
+        product.add_argument("-o", "--output", type=Path)
+
     return parser
 
 
@@ -268,6 +319,8 @@ def main() -> int:
             out = scrape_page("financas", args.path, args.format, args.output)
         elif args.command == "financas" and args.action == "api":
             out = scrape_financas_api(args.path, args.output)
+        elif args.command in {"carteira", "dicionario"}:
+            out = scrape_api_contract(args.command, args.path, args.output)
         else:
             parser.error("Comando não suportado")
             return 1

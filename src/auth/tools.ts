@@ -22,8 +22,12 @@ import {
   jsonResult,
   type ToolDefinition,
 } from "../mcp/tool-utils.js";
+import { ALL_AUVP_MODULES, type AuvpModule } from "../mcp/modules.js";
 
-export const authToolDefinitions: ToolDefinition[] = [
+export function createAuthToolDefinitions(
+  enabledModules: readonly AuvpModule[] = ALL_AUVP_MODULES,
+): ToolDefinition[] {
+  return [
   defineTool(
     "auvp_create_sso_login_url",
     "Create the AUVP SSO login URL via /auth/redirect-url so the API issues a valid OIDC state for this MCP session.",
@@ -68,6 +72,7 @@ export const authToolDefinitions: ToolDefinition[] = [
           fresh: parsed.fresh,
           forceBrowser: parsed.forceBrowser,
           interactive: parsed.interactive ?? true,
+          modules: enabledModules,
         }),
       );
     },
@@ -84,4 +89,8 @@ export const authToolDefinitions: ToolDefinition[] = [
       });
     },
   ),
-];
+  ];
+}
+
+export const authToolDefinitions: ToolDefinition[] =
+  createAuthToolDefinitions();
