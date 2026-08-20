@@ -20,6 +20,9 @@ export interface AuvpFinancasClientOptions {
   analiticaOrigin?: string;
   comunidadeBaseUrl?: string;
   comunidadeOrigin?: string;
+  carteiraBaseUrl?: string;
+  carteiraOrigin?: string;
+  dicionarioBaseUrl?: string;
   timeoutMs?: number;
   extraHeaders?: StringHeaders;
   fetchImpl?: FetchLike;
@@ -35,6 +38,7 @@ interface RequestOptions {
   responseType?: "json" | "text";
   extraHeaders?: StringHeaders;
   timeoutMs?: number;
+  authTarget?: "financas" | "analitica" | "comunidade" | "carteira" | "none";
 }
 
 export class AuvpFinancasClient {
@@ -44,6 +48,9 @@ export class AuvpFinancasClient {
   private readonly analiticaOrigin: string;
   private readonly comunidadeBaseUrl: URL;
   private readonly comunidadeOrigin: string;
+  private readonly carteiraBaseUrl: URL;
+  private readonly carteiraOrigin: string;
+  private readonly dicionarioBaseUrl: URL;
   private readonly timeoutMs: number;
   private readonly extraHeaders: StringHeaders;
   private readonly fetchImpl: FetchLike;
@@ -51,6 +58,7 @@ export class AuvpFinancasClient {
   private bearerToken?: string;
   private analiticaCookieHeader?: string;
   private comunidadeCookieHeader?: string;
+  private carteiraToken?: string;
 
   constructor(options: AuvpFinancasClientOptions = {}) {
     const envConfig = loadConfigFromEnv();
@@ -67,6 +75,13 @@ export class AuvpFinancasClient {
     );
     this.comunidadeOrigin =
       options.comunidadeOrigin ?? envConfig.comunidadeOrigin;
+    this.carteiraBaseUrl = new URL(
+      options.carteiraBaseUrl ?? envConfig.carteiraBaseUrl,
+    );
+    this.carteiraOrigin = options.carteiraOrigin ?? envConfig.carteiraOrigin;
+    this.dicionarioBaseUrl = new URL(
+      options.dicionarioBaseUrl ?? envConfig.dicionarioBaseUrl,
+    );
     this.timeoutMs = options.timeoutMs ?? envConfig.timeoutMs;
     this.extraHeaders = options.extraHeaders ?? envConfig.extraHeaders;
     this.fetchImpl = options.fetchImpl ?? fetch;
@@ -166,6 +181,64 @@ export class AuvpFinancasClient {
     }) as Promise<string>;
   }
 
+  async getCarteira(path: string, query?: QueryParams): Promise<unknown> {
+    return this.request("GET", path, {
+      query,
+      baseUrl: this.carteiraBaseUrl,
+      origin: this.carteiraOrigin,
+      authTarget: "carteira",
+    });
+  }
+
+  async postCarteira(path: string, body: unknown): Promise<unknown> {
+    return this.request("POST", path, {
+      body,
+      baseUrl: this.carteiraBaseUrl,
+      origin: this.carteiraOrigin,
+      authTarget: "carteira",
+    });
+  }
+
+  async patchCarteira(path: string, body: unknown): Promise<unknown> {
+    return this.request("PATCH", path, {
+      body,
+      baseUrl: this.carteiraBaseUrl,
+      origin: this.carteiraOrigin,
+      authTarget: "carteira",
+    });
+  }
+
+  async deleteCarteira(path: string, query?: QueryParams): Promise<unknown> {
+    return this.request("DELETE", path, {
+      query,
+      baseUrl: this.carteiraBaseUrl,
+      origin: this.carteiraOrigin,
+      authTarget: "carteira",
+    });
+  }
+
+  async getDicionario(path: string, query?: QueryParams): Promise<unknown> {
+    return this.request("GET", path, {
+      query,
+      baseUrl: this.dicionarioBaseUrl,
+      origin: this.comunidadeOrigin,
+      authTarget: "none",
+      extraHeaders: {
+        referer: `${this.comunidadeOrigin}/dicion%C3%A1rio/`,
+      },
+    });
+  }
+
+  async getCarteiraPageText(path: string): Promise<string> {
+    return this.request("GET", path, {
+      baseUrl: new URL(this.carteiraOrigin),
+      origin: this.carteiraOrigin,
+      authTarget: "none",
+      accept: "text/csv,text/plain,*/*",
+      responseType: "text",
+    }) as Promise<string>;
+  }
+
   async fetchRaw(
     input: string | URL,
     init: RequestInit & { headers?: StringHeaders } = {},
@@ -234,6 +307,18 @@ export class AuvpFinancasClient {
     return this.comunidadeCookieHeader;
   }
 
+  setCarteiraToken(token: string): void {
+    this.carteiraToken = token.replace(/^Bearer\s+/i, "").trim();
+  }
+
+  clearCarteiraToken(): void {
+    this.carteiraToken = undefined;
+  }
+
+  getCarteiraToken(): string | undefined {
+    return this.carteiraToken;
+  }
+
   setSessionCookieHeader(cookieHeader: string): string[] {
     const names: string[] = [];
 
@@ -283,6 +368,7 @@ export class AuvpFinancasClient {
     hasSessionCookie: boolean;
     hasAnaliticaCookie: boolean;
     hasComunidadeCookie: boolean;
+    hasCarteiraToken: boolean;
     cookieNames: string[];
   } {
     return {
@@ -294,6 +380,7 @@ export class AuvpFinancasClient {
       hasComunidadeCookie: Boolean(
         this.comunidadeCookieHeader && this.comunidadeCookieHeader.length > 0,
       ),
+      hasCarteiraToken: Boolean(this.carteiraToken),
       cookieNames: this.getSessionCookieNames(),
     };
   }
@@ -323,6 +410,7 @@ export class AuvpFinancasClient {
         },
         method !== "GET",
         options.origin,
+        options.authTarget,
       );
 
       const init: RequestInit = {
@@ -396,10 +484,20 @@ export class AuvpFinancasClient {
     overrides: StringHeaders = {},
     includeJsonContentType = false,
     originOverride?: string,
+    authTarget?: RequestOptions["authTarget"],
   ): StringHeaders {
     const origin = originOverride ?? this.origin;
-    const isAnaliticaRequest = origin === this.analiticaOrigin;
-    const isComunidadeRequest = origin === this.comunidadeOrigin;
+    const target =
+      authTarget ??
+      (origin === this.analiticaOrigin
+        ? "analitica"
+        : origin === this.comunidadeOrigin
+          ? "comunidade"
+          : origin === this.carteiraOrigin
+            ? "carteira"
+            : "financas");
+    const isAnaliticaRequest = target === "analitica";
+    const isComunidadeRequest = target === "comunidade";
     const headers: StringHeaders = {
       accept: isComunidadeRequest
         ? "*/*"
@@ -441,6 +539,21 @@ export class AuvpFinancasClient {
         headers.cookie = this.comunidadeCookieHeader;
       }
 
+      return headers;
+    }
+
+    if (target === "carteira") {
+      headers["user-agent"] = ANALITICA_BROWSER_UA;
+      headers["sec-fetch-dest"] = "empty";
+      headers["sec-fetch-mode"] = "cors";
+      headers["sec-fetch-site"] = "same-site";
+      if (this.carteiraToken && !hasHeader(headers, "authorization")) {
+        headers.authorization = `Bearer ${this.carteiraToken}`;
+      }
+      return headers;
+    }
+
+    if (target === "none") {
       return headers;
     }
 

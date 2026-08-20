@@ -43,6 +43,8 @@ export const ANALITICA_API_ROUTES: readonly AnaliticaApiRoute[] = [
   { method: "GET", path: "/api/codes/ranked-by-rating", queryKeys: ["rating_type", "limit", "page", "type"], description: "Ranking por rating." },
   { method: "GET", path: "/api/credits", description: "Créditos de visualização (assets, tools)." },
   { method: "GET", path: "/api/currency-quote", queryKeys: ["currency"], description: "Cotação de moeda (ex. USD)." },
+  { method: "GET", path: "/api/cdn/images/assets/:path", description: "Prefixo CDN observado para imagens de ativos.", note: "Recurso binário; não exposto como tool." },
+  { method: "GET", path: "/api/credit-portfolio", queryKeys: ["companyId", "report", "period", "aggregate"], description: "Composição da carteira de crédito por indexador, região ou PF/PJ." },
   {
     method: "GET",
     path: "/api/column-templates",

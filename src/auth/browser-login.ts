@@ -5,12 +5,14 @@ import {
   ANALITICA_HOME_URL,
   buildCookieHeaderFromPlaywrightCookies,
   hasAnaliticaSessionCookie,
+  getAnaliticaCookieFilePath,
   loadPersistedAnaliticaCookieHeader,
   persistAnaliticaCookieHeader,
 } from "../analitica/cookies.js";
 import {
   COMUNIDADE_HOME_URL,
   hasComunidadeSessionCookie,
+  getComunidadeCookieFilePath,
   loadPersistedComunidadeCookieHeader,
   persistComunidadeCookieHeader,
 } from "../comunidade/cookies.js";
@@ -22,6 +24,13 @@ import {
   persistBearerToken,
 } from "./storage.js";
 import { AuvpConfigError } from "../core/errors.js";
+import {
+  CARTEIRA_HOME_URL,
+  CARTEIRA_LOCAL_STORAGE_KEY,
+  getCarteiraTokenFilePath,
+  persistCarteiraToken,
+} from "../carteira/auth.js";
+import { ALL_AUVP_MODULES, type AuvpModule } from "../mcp/modules.js";
 
 const LOGIN_URL = "https://financas.auvp.com.br/sign-in";
 const DASHBOARD_URL = "https://financas.auvp.com.br/";
@@ -31,6 +40,7 @@ export interface BrowserLoginOptions {
   fresh?: boolean;
   headless?: boolean;
   waitTimeoutMs?: number;
+  modules?: readonly AuvpModule[];
 }
 
 export interface BrowserLoginResult {
@@ -42,6 +52,8 @@ export interface BrowserLoginResult {
   analiticaCookieFile?: string;
   comunidadeCookieCaptured: boolean;
   comunidadeCookieFile?: string;
+  carteiraTokenCaptured: boolean;
+  carteiraTokenFile?: string;
 }
 
 let activeLogin: Promise<BrowserLoginResult | undefined> | null = null;
@@ -223,6 +235,38 @@ async function captureComunidadeCookies(
   return undefined;
 }
 
+async function captureCarteiraToken(
+  page: Page,
+  timeoutMs = 60_000,
+): Promise<string | undefined> {
+  console.error("[mcp-auvp] Coletando token da Carteira…");
+  try {
+    await page.goto(CARTEIRA_HOME_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("ERR_ABORTED") && !message.includes("Timeout")) throw error;
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline && !page.isClosed()) {
+    const token = await page.evaluate(
+      (key) => globalThis.localStorage?.getItem(key) ?? undefined,
+      CARTEIRA_LOCAL_STORAGE_KEY,
+    ).catch(() => undefined);
+    if (token) {
+      const file = persistCarteiraToken(token);
+      console.error(`[mcp-auvp] Token da Carteira salvo em ${file}`);
+      return file;
+    }
+    await page.waitForTimeout(500);
+  }
+  console.error("[mcp-auvp] Token da Carteira ainda não disponível após visitar o site.");
+  return undefined;
+}
+
 function buildLoginResult(
   token: string,
   tokenFile: string,
@@ -230,6 +274,7 @@ function buildLoginResult(
   method: BrowserLoginResult["method"],
   analiticaCookieFile?: string,
   comunidadeCookieFile?: string,
+  carteiraTokenFile?: string,
 ): BrowserLoginResult {
   return {
     token,
@@ -240,7 +285,31 @@ function buildLoginResult(
     analiticaCookieFile,
     comunidadeCookieCaptured: Boolean(comunidadeCookieFile),
     comunidadeCookieFile,
+    carteiraTokenCaptured: Boolean(carteiraTokenFile),
+    carteiraTokenFile,
   };
+}
+
+async function captureSelectedModuleAuth(
+  context: BrowserContext,
+  page: Page,
+  modules: readonly AuvpModule[],
+  timeoutMs: number,
+): Promise<{
+  analiticaCookieFile?: string;
+  comunidadeCookieFile?: string;
+  carteiraTokenFile?: string;
+}> {
+  const analiticaCookieFile = modules.includes("analitica")
+    ? await captureAnaliticaCookies(context, page, timeoutMs)
+    : undefined;
+  const comunidadeCookieFile = modules.includes("comunidade")
+    ? await captureComunidadeCookies(context, page, timeoutMs)
+    : undefined;
+  const carteiraTokenFile = modules.includes("carteira")
+    ? await captureCarteiraToken(page, timeoutMs)
+    : undefined;
+  return { analiticaCookieFile, comunidadeCookieFile, carteiraTokenFile };
 }
 
 async function tryReadTokenFromOpenInteractiveContext(): Promise<
@@ -259,8 +328,10 @@ async function tryReadTokenFromOpenInteractiveContext(): Promise<
 }
 
 async function runSilentBrowserLogin(
-  waitTimeoutMs: number,
+  options: BrowserLoginOptions,
 ): Promise<BrowserLoginResult | undefined> {
+  const waitTimeoutMs = options.waitTimeoutMs ?? 25_000;
+  const modules = options.modules ?? ALL_AUVP_MODULES;
   const storageStatePath = getStorageStatePath();
   if (!existsSync(storageStatePath)) {
     return undefined;
@@ -288,8 +359,7 @@ async function runSilentBrowserLogin(
     }
 
     const savedTokenFile = persistBearerToken(token);
-    const analiticaCookieFile = await captureAnaliticaCookies(context, page, 30_000);
-    const comunidadeCookieFile = await captureComunidadeCookies(context, page, 30_000);
+    const captured = await captureSelectedModuleAuth(context, page, modules, 30_000);
     await context.storageState({ path: storageStatePath });
 
     return buildLoginResult(
@@ -297,8 +367,9 @@ async function runSilentBrowserLogin(
       savedTokenFile,
       getBrowserProfileDir(),
       "silent_browser",
-      analiticaCookieFile,
-      comunidadeCookieFile,
+      captured.analiticaCookieFile,
+      captured.comunidadeCookieFile,
+      captured.carteiraTokenFile,
     );
   } finally {
     await browser?.close();
@@ -342,6 +413,7 @@ async function runInteractiveBrowserLogin(
 ): Promise<BrowserLoginResult | undefined> {
   const fresh = options.fresh ?? false;
   const waitTimeoutMs = options.waitTimeoutMs ?? 10 * 60_000;
+  const modules = options.modules ?? ALL_AUVP_MODULES;
   const profileDir = getBrowserProfileDir();
   const tokenFile = getTokenFilePath();
 
@@ -356,20 +428,23 @@ async function runInteractiveBrowserLogin(
       rmSync(stateFile, { force: true });
     }
   }
+  if (fresh) {
+    for (const credentialFile of [
+      tokenFile,
+      getAnaliticaCookieFilePath(),
+      getComunidadeCookieFilePath(),
+      getCarteiraTokenFilePath(),
+    ]) {
+      if (existsSync(credentialFile)) rmSync(credentialFile, { force: true });
+    }
+  }
 
   const pendingToken = await tryReadTokenFromOpenInteractiveContext();
   if (pendingToken) {
     const savedTokenFile = persistBearerToken(pendingToken);
     const pendingPage = await getOrCreatePage(openInteractiveContext!);
-    const analiticaCookieFile = await captureAnaliticaCookies(
-      openInteractiveContext!,
-      pendingPage,
-      30_000,
-    );
-    const comunidadeCookieFile = await captureComunidadeCookies(
-      openInteractiveContext!,
-      pendingPage,
-      30_000,
+    const captured = await captureSelectedModuleAuth(
+      openInteractiveContext!, pendingPage, modules, 30_000,
     );
     await persistStorageState(openInteractiveContext!);
     await closeInteractiveBrowser();
@@ -379,8 +454,9 @@ async function runInteractiveBrowserLogin(
       savedTokenFile,
       profileDir,
       "interactive_browser",
-      analiticaCookieFile,
-      comunidadeCookieFile,
+      captured.analiticaCookieFile,
+      captured.comunidadeCookieFile,
+      captured.carteiraTokenFile,
     );
   }
 
@@ -429,16 +505,7 @@ async function runInteractiveBrowserLogin(
     }
 
     const savedTokenFile = persistBearerToken(token);
-    const analiticaCookieFile = await captureAnaliticaCookies(
-      context,
-      page,
-      60_000,
-    );
-    const comunidadeCookieFile = await captureComunidadeCookies(
-      context,
-      page,
-      60_000,
-    );
+    const captured = await captureSelectedModuleAuth(context, page, modules, 60_000);
     await persistStorageState(context);
 
     return buildLoginResult(
@@ -446,8 +513,9 @@ async function runInteractiveBrowserLogin(
       savedTokenFile,
       profileDir,
       "interactive_browser",
-      analiticaCookieFile,
-      comunidadeCookieFile,
+      captured.analiticaCookieFile,
+      captured.comunidadeCookieFile,
+      captured.carteiraTokenFile,
     );
   } finally {
     if (openInteractiveContext) {
@@ -479,7 +547,7 @@ async function runBrowserLoginInternal(
   const headless = options.headless ?? false;
 
   if (headless) {
-    return runSilentBrowserLogin(options.waitTimeoutMs ?? 25_000);
+    return runSilentBrowserLogin(options);
   }
 
   return runInteractiveBrowserLogin(options);

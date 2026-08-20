@@ -9,8 +9,8 @@ const distEntry = join(root, "dist", "index.js");
 const srcEntry = join(root, "src", "index.ts");
 
 const nodeArgs = existsSync(distEntry)
-  ? [distEntry]
-  : ["--import", "tsx", srcEntry];
+  ? [distEntry, ...process.argv.slice(2)]
+  : ["--import", "tsx", srcEntry, ...process.argv.slice(2)];
 
 const child = spawn(process.execPath, nodeArgs, {
   cwd: root,

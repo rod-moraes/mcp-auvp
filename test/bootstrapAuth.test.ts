@@ -26,25 +26,26 @@ describe("bootstrap auth on startup", () => {
     expect(result).toBeUndefined();
   });
 
-  it("forces browser login on every startup by default", () => {
-    expect(ensureAuthModule.shouldForceLoginOnStart({})).toBe(true);
+  it("does not force browser login on startup by default", () => {
+    expect(ensureAuthModule.shouldForceLoginOnStart({})).toBe(false);
     expect(
       ensureAuthModule.shouldForceLoginOnStart({
-        AUVP_FINANCAS_FORCE_LOGIN_ON_START: "0",
+        AUVP_FINANCAS_FORCE_LOGIN_ON_START: "1",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("uses forceBrowser on startup by default", () => {
+  it("validates and attempts silent renewal before visible login", () => {
     expect(ensureAuthModule.getBootstrapAuthOptions({})).toEqual({
       interactive: true,
-      skipSilent: true,
-      forceBrowser: true,
+      skipSilent: false,
+      forceBrowser: false,
+      modules: ["financas", "analitica", "comunidade", "carteira", "dicionario"],
     });
     expect(
       ensureAuthModule.getBootstrapAuthOptions({
-        AUVP_FINANCAS_FORCE_LOGIN_ON_START: "0",
+        AUVP_FINANCAS_FORCE_LOGIN_ON_START: "1",
       }).forceBrowser,
-    ).toBe(false);
+    ).toBe(true);
   });
 });

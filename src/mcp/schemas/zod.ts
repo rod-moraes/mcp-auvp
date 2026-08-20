@@ -175,6 +175,15 @@ export const analiticaGetCodeSchema = z
   })
   .strict();
 
+export const analiticaCreditPortfolioSchema = z
+  .object({
+    companyId: z.number().int().positive(),
+    report: z.enum(["indexador", "region", "pf_pj"]),
+    period: z.string().min(1).default("5Y"),
+    aggregate: z.string().min(1).default("ANUAL"),
+  })
+  .strict();
+
 export const analiticaGetQuotesSchema = z
   .object({
     ticker: analiticaCodeSchema,

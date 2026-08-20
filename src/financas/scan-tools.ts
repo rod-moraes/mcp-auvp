@@ -3,6 +3,7 @@ import type { AuvpFinancasClient } from "../core/http-client.js";
 import { callAuvpTool } from "../mcp/registry.js";
 import type { ToolResult } from "../mcp/tool-utils.js";
 import { financasToolDefinitions } from "./tools.js";
+import { sanitizeReportError } from "../core/report-sanitizer.js";
 
 export interface FinancasToolScanResult {
   tool: string;
@@ -30,7 +31,12 @@ export interface FinancasScanContext {
 export interface FinancasScanReport {
   scannedAt: string;
   hasToken: boolean;
-  context: FinancasScanContext;
+  context: {
+    hasAccount: boolean;
+    hasCreditAccount: boolean;
+    hasTransaction: boolean;
+    hasTag: boolean;
+  };
   results: FinancasToolScanResult[];
   summary: {
     total: number;
@@ -207,6 +213,8 @@ function buildReadProbes(context: FinancasScanContext): ScanProbe[] {
 
   return [
     { tool: "auvp_financas_list_observed_routes", args: {} },
+    { tool: "auvp_financas_get_access_status", args: {} },
+    { tool: "auvp_financas_get_feature_flags", args: {} },
     { tool: "auvp_financas_get_profile", args: {} },
     {
       tool: "auvp_financas_get_user",
@@ -215,6 +223,7 @@ function buildReadProbes(context: FinancasScanContext): ScanProbe[] {
     },
     { tool: "auvp_financas_list_accounts", args: {} },
     { tool: "auvp_financas_list_account_last_transactions", args: {} },
+    { tool: "auvp_financas_list_hidden_accounts", args: {} },
     {
       tool: "auvp_financas_get_account",
       args: { accountId: context.accountId ?? "1" },
@@ -247,11 +256,8 @@ function buildReadProbes(context: FinancasScanContext): ScanProbe[] {
       args: {},
       expectedFailure: true,
     },
-    { tool: "auvp_financas_list_user_categories", args: {} },
     { tool: "auvp_financas_list_tags", args: {} },
     { tool: "auvp_financas_list_banks", args: {} },
-    { tool: "auvp_financas_get_bridge_status", args: {} },
-    { tool: "auvp_financas_create_pluggy_connect_token", args: {} },
     {
       tool: "auvp_financas_get_account_bills",
       args: { accountId: context.creditAccountId ?? context.accountId ?? "1" },
@@ -475,7 +481,7 @@ async function runProbe(
     ok: !result.isError || expectedFailure,
     isError: Boolean(result.isError),
     httpCode,
-    error: errorText,
+    error: sanitizeReportError(errorText),
     durationMs,
     expectedFailure,
     createdId,
@@ -484,6 +490,7 @@ async function runProbe(
 
 export async function scanFinancasTools(
   client: AuvpFinancasClient,
+  options: { allowWrites?: boolean } = {},
 ): Promise<FinancasScanReport> {
   const context = await discoverContext(client);
   const results: FinancasToolScanResult[] = [];
@@ -503,19 +510,21 @@ export async function scanFinancasTools(
     }
   }
 
-  try {
-    const writeCycle = await runWriteCycle(client, context);
-    results.push(...writeCycle.results);
-    Object.assign(context, writeCycle.context);
-  } catch (error) {
-    results.push({
-      tool: "auvp_financas_write_cycle",
-      ok: false,
-      isError: true,
-      httpCode: error instanceof AuvpApiError ? error.status : undefined,
-      error: error instanceof Error ? error.message : String(error),
-      durationMs: 0,
-    });
+  if (options.allowWrites) {
+    try {
+      const writeCycle = await runWriteCycle(client, context);
+      results.push(...writeCycle.results);
+      Object.assign(context, writeCycle.context);
+    } catch (error) {
+      results.push({
+        tool: "auvp_financas_write_cycle",
+        ok: false,
+        isError: true,
+        httpCode: error instanceof AuvpApiError ? error.status : undefined,
+        error: sanitizeReportError(error instanceof Error ? error.message : String(error)),
+        durationMs: 0,
+      });
+    }
   }
 
   const skipped = results.filter((result) => result.skipped).length;
@@ -528,7 +537,12 @@ export async function scanFinancasTools(
   return {
     scannedAt: new Date().toISOString(),
     hasToken: Boolean(client.getBearerToken()),
-    context,
+    context: {
+      hasAccount: Boolean(context.accountId),
+      hasCreditAccount: Boolean(context.creditAccountId),
+      hasTransaction: Boolean(context.transactionId),
+      hasTag: Boolean(context.tagId),
+    },
     results,
     summary: {
       total: results.length,

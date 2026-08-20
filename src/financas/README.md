@@ -50,7 +50,6 @@ Prefixo: `auvp_financas_`. Liste tudo em runtime com `auvp_financas_list_observe
 | `delete_account` | `DELETE /accounts/:accountId` |
 | `get_account_bills` | `GET /bills/account/:accountId` *(404 se não for cartão)* |
 | `list_banks` | `GET /banks` |
-| `get_bridge_status` | `GET /bridge/status` |
 | `create_pluggy_connect_token` | `POST /pluggy/connect-token` |
 
 ### Transações
@@ -88,7 +87,6 @@ Transação manual: use `accountId` (número), `date` em `dd-MM-yyyy HH:mm`, `ty
 |------|----------|
 | `list_categories` | `GET /categories` (catálogo Pluggy) |
 | `get_categories_tree` | `GET /categories/tree` *(403 em alguns planos)* |
-| `list_user_categories` | `GET /user-categories` (categorias do usuário) |
 | `create_category` | `POST /categories` *(admin; pode 403/500)* |
 | `delete_category` | `DELETE /categories/:categoryId` |
 | `list_tags` | `GET /tags` |
@@ -103,7 +101,6 @@ Transação manual: use `accountId` (número), `date` em `dd-MM-yyyy HH:mm`, `ty
 Documentadas em `catalog.ts` para descoberta e SSO; não expostas como tools de escrita:
 
 - `GET /auth/redirect-url` — fluxo SSO (tools `auvp_create_sso_login_url` / `auvp_complete_sso_login`)
-- `POST /auth/validate-token`, `POST /auth/refresh-token` — uso interno do frontend; renovação via `auvp_ensure_auth`
 
 ---
 
@@ -129,7 +126,7 @@ python scripts/discover_endpoints.py financas-all
 python scripts/discover_endpoints.py financas --path /dashboard/transactions
 
 # Probe pontual
-python scripts/discover_endpoints.py probe --site financas_api --path /user-categories
+python scripts/discover_endpoints.py probe --site financas_api --path /categories
 ```
 
 Relatórios em `data/endpoint-discovery/`. O método mais confiável é **probe REST com bearer**; o XHR via browser exige sessão logada no SPA (bearer em memória).

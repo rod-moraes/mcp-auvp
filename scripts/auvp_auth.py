@@ -16,13 +16,19 @@ STORAGE_STATE_FILE = AUVP_DIR / "storage-state.json"
 TOKEN_FILE = AUVP_DIR / "access-token"
 ANALITICA_COOKIE_FILE = AUVP_DIR / "analitica-cookie"
 COMUNIDADE_COOKIE_FILE = AUVP_DIR / "comunidade-cookie"
+CARTEIRA_TOKEN_FILE = AUVP_DIR / "carteira-token"
 
 COMUNIDADE_ORIGIN = "https://comunidade.auvp.com.br"
 ANALITICA_ORIGIN = "https://analitica.auvp.com.br"
 FINANCAS_ORIGIN = "https://financas.auvp.com.br"
 FINANCAS_API = "https://financas-api.auvp.com.br"
+CARTEIRA_ORIGIN = "https://ferramentas.auvp.com.br"
+CARTEIRA_API = "https://ferramentas-backend.auvp.com.br"
+DICIONARIO_API = "https://worker.auvp.com.br"
 
-Site = Literal["comunidade", "analitica", "financas", "financas_api"]
+Site = Literal[
+    "comunidade", "analitica", "financas", "financas_api", "carteira", "dicionario"
+]
 
 
 def _read_line(path: Path) -> str | None:
@@ -53,6 +59,13 @@ def load_comunidade_cookie() -> str | None:
     if inline:
         return inline
     return _read_line(COMUNIDADE_COOKIE_FILE)
+
+
+def load_carteira_token() -> str | None:
+    inline = os.environ.get("AUVP_CARTEIRA_ACCESS_TOKEN", "").strip()
+    if inline:
+        return inline.removeprefix("Bearer ").strip()
+    return _read_line(CARTEIRA_TOKEN_FILE)
 
 
 def _cookie_names(cookie_header: str) -> set[str]:
@@ -106,6 +119,26 @@ def xsrf_header_from_cookie(cookie: str) -> dict[str, str]:
 
 
 def headers_for_site(site: Site) -> dict[str, str]:
+    if site == "dicionario":
+        return {
+            "Origin": COMUNIDADE_ORIGIN,
+            "Referer": f"{COMUNIDADE_ORIGIN}/dicion%C3%A1rio/",
+            "Accept": "application/json",
+        }
+
+    if site == "carteira":
+        token = load_carteira_token()
+        if not token:
+            raise RuntimeError(
+                "Token da Carteira ausente. Rode auvp_ensure_auth no MCP."
+            )
+        return {
+            "Authorization": f"Bearer {token}",
+            "Origin": CARTEIRA_ORIGIN,
+            "Referer": f"{CARTEIRA_ORIGIN}/carteira",
+            "Accept": "application/json",
+        }
+
     if site == "comunidade":
         cookie = load_comunidade_cookie()
         if not cookie:
@@ -149,6 +182,11 @@ def headers_for_site(site: Site) -> dict[str, str]:
             headers.update(xsrf_header_from_cookie(cookie))
         if token:
             headers["Authorization"] = f"Bearer {token}"
+            headers["Cookie"] = (
+                f"{headers.get('Cookie')}; accessToken={token}"
+                if headers.get("Cookie")
+                else f"accessToken={token}"
+            )
         if not cookie and not token:
             raise RuntimeError(
                 "Sessão Finanças ausente. Rode auvp_ensure_auth no MCP."
@@ -175,15 +213,18 @@ def auth_status() -> dict[str, object]:
     token = load_bearer_token()
     analitica = load_analitica_cookie()
     comunidade = load_comunidade_cookie()
+    carteira = load_carteira_token()
     return {
         "auvp_dir": str(AUVP_DIR),
         "bearer_token": bool(token),
         "analitica_cookie": has_analitica_session(analitica),
         "comunidade_cookie": has_comunidade_session(comunidade),
+        "carteira_token": bool(carteira),
         "files": {
             "access_token": TOKEN_FILE.exists(),
             "analitica_cookie": ANALITICA_COOKIE_FILE.exists(),
             "comunidade_cookie": COMUNIDADE_COOKIE_FILE.exists(),
+            "carteira_token": CARTEIRA_TOKEN_FILE.exists(),
         },
     }
 

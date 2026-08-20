@@ -58,6 +58,24 @@ export const financasToolDefinitions: ToolDefinition[] = [
     },
   ),
   defineTool(
+    "auvp_financas_get_access_status",
+    "GET /access/status — consulta acesso e plano do usuário atual.",
+    emptyInputSchema,
+    async (client, args) => {
+      emptyArgsSchema.parse(args ?? {});
+      return jsonResult(await client.get("/access/status"));
+    },
+  ),
+  defineTool(
+    "auvp_financas_get_feature_flags",
+    "GET /feature-flags/me — lista feature flags habilitadas para o usuário.",
+    emptyInputSchema,
+    async (client, args) => {
+      emptyArgsSchema.parse(args ?? {});
+      return jsonResult(await client.get("/feature-flags/me"));
+    },
+  ),
+  defineTool(
     "auvp_financas_get_profile",
     "GET /users/profile — perfil do usuário logado no AUVP Finanças.",
     emptyInputSchema,
@@ -91,6 +109,15 @@ export const financasToolDefinitions: ToolDefinition[] = [
     async (client, args) => {
       emptyArgsSchema.parse(args ?? {});
       return jsonResult(await client.get("/accounts/lastTransactions"));
+    },
+  ),
+  defineTool(
+    "auvp_financas_list_hidden_accounts",
+    "GET /accounts/hidden — lista contas ocultas no Finanças.",
+    emptyInputSchema,
+    async (client, args) => {
+      emptyArgsSchema.parse(args ?? {});
+      return jsonResult(await client.get("/accounts/hidden"));
     },
   ),
   defineTool(
@@ -299,15 +326,6 @@ export const financasToolDefinitions: ToolDefinition[] = [
     },
   ),
   defineTool(
-    "auvp_financas_list_user_categories",
-    "GET /user-categories — categorias personalizadas do usuário.",
-    emptyInputSchema,
-    async (client, args) => {
-      emptyArgsSchema.parse(args ?? {});
-      return jsonResult(await client.get("/user-categories"));
-    },
-  ),
-  defineTool(
     "auvp_financas_create_category",
     "POST /categories — cria categoria no catálogo Pluggy (uso administrativo; pode retornar 403/500).",
     createCategoryInputSchema,
@@ -392,15 +410,6 @@ export const financasToolDefinitions: ToolDefinition[] = [
       return jsonResult(
         await client.get(`/bills/account/${parsed.accountId}`),
       );
-    },
-  ),
-  defineTool(
-    "auvp_financas_get_bridge_status",
-    "GET /bridge/status — status da sincronização bancária.",
-    emptyInputSchema,
-    async (client, args) => {
-      emptyArgsSchema.parse(args ?? {});
-      return jsonResult(await client.get("/bridge/status"));
     },
   ),
   defineTool(

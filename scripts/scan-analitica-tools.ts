@@ -30,7 +30,7 @@ async function main(): Promise<void> {
 
   console.log(`Relatório salvo em ${outputPath}`);
   console.log(
-    `Contexto: userId=${report.context.userId ?? "n/a"}, sampleCode=${report.context.sampleCode}`,
+    `Contexto: usuário=${report.context.hasUserId ? "presente" : "ausente"}, sampleCode=${report.context.sampleCode}`,
   );
   console.log(
     `Resumo: ${report.summary.ok} ok, ${report.summary.error} erro inesperado, ${report.summary.expectedError} erro esperado, ${report.summary.skipped} ignorados (total ${report.summary.total})`,

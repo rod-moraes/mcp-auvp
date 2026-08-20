@@ -3,6 +3,7 @@ import type { AuvpFinancasClient } from "../core/http-client.js";
 import { callAuvpTool } from "../mcp/registry.js";
 import type { ToolResult } from "../mcp/tool-utils.js";
 import { analiticaToolDefinitions } from "./tools.js";
+import { sanitizeReportError } from "../core/report-sanitizer.js";
 
 const DEFAULT_SAMPLE_CODE = "BBAS3";
 const ANALITICA_TEST_LIMIT = 20;
@@ -28,7 +29,7 @@ export interface AnaliticaScanReport {
   scannedAt: string;
   hasToken: boolean;
   hasAnaliticaCookie: boolean;
-  context: AnaliticaScanContext;
+  context: { hasUserId: boolean; sampleCode: string };
   results: AnaliticaToolScanResult[];
   summary: {
     total: number;
@@ -207,14 +208,6 @@ function buildProbes(context: AnaliticaScanContext): ScanProbe[] {
       },
     },
     {
-      tool: "auvp_analitica_get_home_ranking",
-      args: {
-        companyType: "stock",
-        country: "BRA",
-        rankingType: "dividend_yield",
-      },
-    },
-    {
       tool: "auvp_analitica_get_ranking",
       args: {
         segment: "acoes",
@@ -256,9 +249,12 @@ function buildProbes(context: AnaliticaScanContext): ScanProbe[] {
       tool: "auvp_analitica_get_assets_config",
       args: { companyType: "BRA:stock", countryType: "BRA" },
     },
-    { tool: "auvp_analitica_get_asset_tooltip", args: { code } },
     { tool: "auvp_analitica_get_credits", args: {} },
     { tool: "auvp_analitica_get_currency_quote", args: { currency: "USD" } },
+    {
+      tool: "auvp_analitica_get_credit_portfolio",
+      args: { companyId: 340, report: "indexador", period: "5Y", aggregate: "ANUAL" },
+    },
     { tool: "auvp_analitica_list_indices_quotes", args: {} },
     { tool: "auvp_analitica_list_rates", args: {} },
     { tool: "auvp_analitica_list_news", args: { asset: code, page: 1 } },
@@ -320,7 +316,7 @@ async function runProbe(
     ok: !result.isError || expectedFailure,
     isError: Boolean(result.isError),
     httpCode,
-    error: errorText,
+    error: sanitizeReportError(errorText),
     durationMs,
     expectedFailure,
   };
@@ -341,7 +337,7 @@ export async function scanAnaliticaTools(
         ok: false,
         isError: true,
         httpCode: error instanceof AuvpApiError ? error.status : undefined,
-        error: error instanceof Error ? error.message : String(error),
+        error: sanitizeReportError(error instanceof Error ? error.message : String(error)),
         durationMs: 0,
       });
     }
@@ -358,7 +354,7 @@ export async function scanAnaliticaTools(
     scannedAt: new Date().toISOString(),
     hasToken: Boolean(client.getBearerToken()),
     hasAnaliticaCookie: Boolean(client.getAnaliticaCookieHeader()),
-    context,
+    context: { hasUserId: Boolean(context.userId), sampleCode: context.sampleCode },
     results,
     summary: {
       total: results.length,

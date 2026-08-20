@@ -31,7 +31,10 @@
     "scan:financas": "tsx scripts/scan-financas-tools.ts",
     "scan:analitica": "tsx scripts/scan-analitica-tools.ts",
     "audit:analitica": "tsx scripts/audit-analitica-tools.ts",
+    "discover:all": ".venv-scrapling/bin/python scripts/discover_endpoints.py all",
     "scan:comunidade": "tsx scripts/scan-comunidade-tools.ts",
+    "scan:carteira": "tsx scripts/scan-carteira-tools.ts",
+    "scan:dicionario": "tsx scripts/scan-dicionario-tools.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

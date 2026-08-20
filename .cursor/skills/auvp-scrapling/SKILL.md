@@ -1,8 +1,8 @@
 ---
 name: auvp-scrapling
 description: >-
-  Descobre e documenta endpoints HTTP dos três produtos AUVP (Finanças, Analítica
-  e Comunidade) usando Scrapling, para implementar tools no MCP mcp-auvp. Instalação
+  Descobre e documenta endpoints HTTP dos cinco módulos AUVP (Finanças, Analítica,
+  Comunidade, Carteira e Dicionário) usando Scrapling, para implementar tools no MCP mcp-auvp. Instalação
   deve seguir https://scrapling.readthedocs.io/en/latest/index.html#installation
   (scrapling[all] + scrapling install). Use ao mapear rotas, descobrir APIs ou
   expandir catálogos MCP. NÃO é para extrair conteúdo de páginas.
@@ -10,7 +10,7 @@ description: >-
 
 # AUVP Scrapling — descoberta de endpoints para o MCP
 
-**Objetivo:** para **Finanças**, **Analítica** e **Comunidade**, descobrir quais endpoints existem, como são chamados e o que retornam — para criar/atualizar tools MCP.
+**Objetivo:** para **Finanças**, **Analítica**, **Comunidade**, **Carteira** e **Dicionário**, descobrir quais endpoints existem, como são chamados e o que retornam — para criar/atualizar tools MCP.
 
 **Não é:** raspagem de conteúdo editorial ou dados pessoais do usuário.
 
@@ -71,7 +71,7 @@ Doc geral Scrapling: [readthedocs.io/en/latest](https://scrapling.readthedocs.io
 
 ---
 
-## Lógica unificada (os 3 produtos seguem o mesmo fluxo)
+## Lógica unificada (os 5 módulos seguem o mesmo fluxo)
 
 Cada produto AUVP tem **a mesma estrutura de descoberta**:
 
@@ -161,6 +161,19 @@ python scripts/discover_endpoints.py comunidade-all
 python scripts/discover_endpoints.py comunidade --path /search/
 python scripts/discover_endpoints.py probe --site comunidade --path /search/ --query "q=tesouro&type=forums_topic"
 ```
+
+## Carteira e Dicionário
+
+- Carteira: frontend `ferramentas.auvp.com.br/carteira`, API `ferramentas-backend.auvp.com.br`, bearer em `~/.auvp-financas/carteira-token`.
+- Dicionário: página na Comunidade, API pública `worker.auvp.com.br/dictionary`, sempre com Origin/Referer da Comunidade.
+
+```bash
+python scripts/discover_endpoints.py carteira-all
+python scripts/discover_endpoints.py dicionario-all
+python scripts/discover_endpoints.py all
+```
+
+O comando `all` e os scans padrão são somente leitura. Não persistir corpos, tokens, cookies, e-mails ou conteúdo financeiro/editorial.
 
 ---
 

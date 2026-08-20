@@ -3,6 +3,8 @@ import { ANALITICA_RANKING_REQUEST_TIMEOUT_MS } from "../src/analitica/ranking.j
 import { analiticaToolDefinitions } from "../src/analitica/tools.js";
 import { comunidadeToolDefinitions } from "../src/comunidade/tools.js";
 import { financasToolDefinitions } from "../src/financas/tools.js";
+import { carteiraToolDefinitions } from "../src/carteira/tools.js";
+import { dicionarioToolDefinitions } from "../src/dicionario/tools.js";
 import { callAuvpTool, listAuvpTools } from "../src/mcp/registry.js";
 import type { AuvpFinancasClient } from "../src/core/http-client.js";
 
@@ -17,11 +19,15 @@ function createMockClient(): AuvpFinancasClient {
     setComunidadeCookieHeader: vi.fn(),
     clearComunidadeCookieHeader: vi.fn(),
     getComunidadeCookieHeader: vi.fn(),
+    setCarteiraToken: vi.fn(),
+    clearCarteiraToken: vi.fn(),
+    getCarteiraToken: vi.fn(),
     getAuthStatus: vi.fn().mockReturnValue({
       hasBearerToken: false,
       hasSessionCookie: false,
       hasAnaliticaCookie: false,
       hasComunidadeCookie: false,
+      hasCarteiraToken: false,
       cookieNames: [],
     }),
     get: vi.fn().mockResolvedValue({ ok: true }),
@@ -42,6 +48,19 @@ function createMockClient(): AuvpFinancasClient {
     getComunidadeAjaxText: vi.fn().mockResolvedValue(
       "<li class='ipsDataItem'><strong>1</strong><a href='/profile/1-test/'>Autor</a><span class='ipsRepBadge ipsRepBadge_positive'>10</span></li>",
     ),
+    getCarteira: vi.fn().mockResolvedValue({
+      _id: "user-1",
+      assets: [],
+      investimentGoals: {},
+      diagramQuestions: [],
+    }),
+    postCarteira: vi.fn().mockResolvedValue({ ok: true }),
+    patchCarteira: vi.fn().mockResolvedValue({ ok: true }),
+    deleteCarteira: vi.fn().mockResolvedValue({ ok: true }),
+    getCarteiraPageText: vi.fn().mockResolvedValue(
+      "País,Country,Principal Índice,ETFs Americanos,S&P,Moody's,Fitch,Nível de Risco,Empresa,Ticker,Setor,GeoJSON name\nBrasil,Brazil,Ibovespa,EWZ,BB-,Ba2,BB,bb,Empresa,PETR4,Energia,Brazil\n",
+    ),
+    getDicionario: vi.fn().mockResolvedValue({ terms: [], totalPages: 0 }),
   } as unknown as AuvpFinancasClient;
 }
 
@@ -55,7 +74,25 @@ describe("AUVP MCP tools", () => {
       ...financasToolDefinitions.map((tool) => tool.name),
       ...analiticaToolDefinitions.map((tool) => tool.name),
       ...comunidadeToolDefinitions.map((tool) => tool.name),
+      ...carteiraToolDefinitions.map((tool) => tool.name),
+      ...dicionarioToolDefinitions.map((tool) => tool.name),
     ]);
+  });
+
+  it("lists and dispatches only selected product modules while preserving auth", async () => {
+    const names = listAuvpTools(["dicionario"]).map((tool) => tool.name);
+    expect(names).toContain("auvp_ensure_auth");
+    expect(names).toContain("auvp_dicionario_search_terms");
+    expect(names).not.toContain("auvp_financas_list_accounts");
+
+    const result = await callAuvpTool(
+      createMockClient(),
+      "auvp_financas_list_accounts",
+      {},
+      ["dicionario"],
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({ type: "text", text: expect.stringContaining("Unknown tool") });
   });
 
   it("creates an SSO login URL from the API redirect endpoint", async () => {
@@ -256,6 +293,23 @@ describe("AUVP MCP tools", () => {
     expect(result.isError).toBeUndefined();
     expect(client.getAnalitica).toHaveBeenCalledWith("/api/codes", {
       code: "BBAS3",
+    });
+  });
+
+  it("dispatches Analitica credit-portfolio requests", async () => {
+    const client = createMockClient();
+    const result = await callAuvpTool(client, "auvp_analitica_get_credit_portfolio", {
+      companyId: 340,
+      report: "indexador",
+      period: "5Y",
+      aggregate: "ANUAL",
+    });
+    expect(result.isError).toBeUndefined();
+    expect(client.getAnalitica).toHaveBeenCalledWith("/api/credit-portfolio", {
+      companyId: 340,
+      report: "indexador",
+      period: "5Y",
+      aggregate: "ANUAL",
     });
   });
 

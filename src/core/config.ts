@@ -6,6 +6,10 @@ export const DEFAULT_ANALITICA_BASE_URL = "https://analitica.auvp.com.br";
 export const DEFAULT_ANALITICA_ORIGIN = "https://analitica.auvp.com.br";
 export const DEFAULT_COMUNIDADE_BASE_URL = "https://comunidade.auvp.com.br";
 export const DEFAULT_COMUNIDADE_ORIGIN = "https://comunidade.auvp.com.br";
+export const DEFAULT_CARTEIRA_BASE_URL =
+  "https://ferramentas-backend.auvp.com.br";
+export const DEFAULT_CARTEIRA_ORIGIN = "https://ferramentas.auvp.com.br";
+export const DEFAULT_DICIONARIO_BASE_URL = "https://worker.auvp.com.br";
 export const DEFAULT_SSO_BASE_URL = "https://sso.auvp.com.br";
 export const DEFAULT_SSO_REALM = "AUVP";
 export const DEFAULT_SSO_CLIENT_ID = "financas";
@@ -21,6 +25,9 @@ export interface AuvpConfig {
   analiticaOrigin: string;
   comunidadeBaseUrl: string;
   comunidadeOrigin: string;
+  carteiraBaseUrl: string;
+  carteiraOrigin: string;
+  dicionarioBaseUrl: string;
   timeoutMs: number;
   extraHeaders: StringHeaders;
   ssoBaseUrl: string;
@@ -94,6 +101,11 @@ export function loadConfigFromEnv(
       env.AUVP_COMUNIDADE_BASE_URL ?? DEFAULT_COMUNIDADE_BASE_URL,
     comunidadeOrigin:
       env.AUVP_COMUNIDADE_ORIGIN ?? DEFAULT_COMUNIDADE_ORIGIN,
+    carteiraBaseUrl:
+      env.AUVP_CARTEIRA_BASE_URL ?? DEFAULT_CARTEIRA_BASE_URL,
+    carteiraOrigin: env.AUVP_CARTEIRA_ORIGIN ?? DEFAULT_CARTEIRA_ORIGIN,
+    dicionarioBaseUrl:
+      env.AUVP_DICIONARIO_BASE_URL ?? DEFAULT_DICIONARIO_BASE_URL,
     timeoutMs,
     extraHeaders: parseExtraHeaders(env.AUVP_FINANCAS_EXTRA_HEADERS),
     ssoBaseUrl: env.AUVP_FINANCAS_SSO_BASE_URL ?? DEFAULT_SSO_BASE_URL,

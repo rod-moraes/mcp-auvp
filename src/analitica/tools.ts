@@ -1,6 +1,7 @@
 import type { QueryParams } from "../core/query.js";
 import {
   analiticaAssetTooltipInputSchema,
+  analiticaCreditPortfolioInputSchema,
   analiticaGetAlertsInputSchema,
   analiticaGetAssetsConfigInputSchema,
   analiticaGetBalanceInputSchema,
@@ -31,6 +32,7 @@ import {
 } from "../mcp/schemas/json.js";
 import {
   analiticaAssetTooltipSchema,
+  analiticaCreditPortfolioSchema,
   analiticaGetAlertsSchema,
   analiticaGetAssetsConfigSchema,
   analiticaGetBalanceSchema,
@@ -475,6 +477,22 @@ export const analiticaToolDefinitions: ToolDefinition[] = [
       return jsonResult(
         await client.getAnalitica("/api/currency-quote", {
           currency: parsed.currency,
+        }),
+      );
+    },
+  ),
+  defineTool(
+    "auvp_analitica_get_credit_portfolio",
+    "Get credit-portfolio composition from GET /api/credit-portfolio by company id and report dimension.",
+    analiticaCreditPortfolioInputSchema,
+    async (client, args) => {
+      const parsed = analiticaCreditPortfolioSchema.parse(args ?? {});
+      return jsonResult(
+        await client.getAnalitica("/api/credit-portfolio", {
+          companyId: parsed.companyId,
+          report: parsed.report,
+          period: parsed.period,
+          aggregate: parsed.aggregate,
         }),
       );
     },
