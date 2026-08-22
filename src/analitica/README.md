@@ -5,9 +5,9 @@ Módulo MCP para a plataforma [AUVP Analítica](https://analitica.auvp.com.br/) 
 | Item | Valor |
 |------|-------|
 | **Base** | `https://analitica.auvp.com.br` |
-| **Auth** | `Authorization: Bearer <token>` **+** cookie de sessão (`Cookie:`) |
-| **Bearer em disco** | `~/.auvp-financas/access-token` |
+| **Auth** | Cookie de sessão (`kc-id-token` ou `analitica-token`) + header `X-XSRF-TOKEN` derivado do cookie |
 | **Cookie em disco** | `~/.auvp-financas/analitica-cookie` |
+| **Tools** | **45**, somente leitura |
 | **Contrato JSON** | Respostas `/api/*` em JSON; rankings e páginas SPA em payload **RSC** (Next.js) |
 
 Renove a sessão com `auvp_ensure_auth` (tool transversal do MCP). Detalhes de login e variáveis de ambiente estão no [README principal](../../README.md).
@@ -19,7 +19,7 @@ Renove a sessão com `auvp_ensure_auth` (tool transversal do MCP). Detalhes de l
 | Arquivo | Função |
 |---------|--------|
 | `catalog.ts` | Catálogo de rotas API e páginas SPA observadas |
-| `tools.ts` | Definições das 44 tools `auvp_analitica_*` |
+| `tools.ts` | Definições das 45 tools `auvp_analitica_*` |
 | `scan-tools.ts` | Varredura ao vivo das tools (somente leitura) |
 | `ranking.ts` | Fetch e parse de rankings paginados via RSC |
 | `ranking-display.ts` | Formatação da tabela de ranking (colunas do site) |
@@ -32,7 +32,8 @@ Schemas Zod/JSON compartilhados: `src/mcp/schemas/`.
 
 ## Tools MCP
 
-Prefixo: `auvp_analitica_`. Liste tudo em runtime com `auvp_analitica_list_observed_routes`.
+Prefixo: `auvp_analitica_` (omitido nas tabelas). Liste tudo em runtime com `auvp_analitica_list_observed_routes`.
+Módulo **somente leitura**: nenhuma tool altera dados na plataforma.
 
 ### Catálogo, sessão e conta
 
@@ -93,7 +94,8 @@ Para preview rápido na home, prefira `get_home_ranking`.
 | `get_alerts` | `GET /api/alerts?asset=` |
 | `list_favorites` | `GET /api/favorites/list` |
 | `get_assets_config` | `GET /api/assets-config` — `companyType`, `countryType` |
-| `get_asset_tooltip` | `POST /api/bff?key=asset-image-tooltip` |
+| `get_asset_tooltip` | `POST /api/bff?key=asset-image-tooltip` — inclui o selo de viabilidade |
+| `get_credit_portfolio` | `GET /api/credit-portfolio` — `companyId`, `report` (`indexador`/`region`/`pf_pj`), `period`, `aggregate` |
 
 Filtros de `get_balance`: `codes` (ticker), `indicators` (ex. `ativo_total`), `frequency`, `formatted`, `dres`, `period`, `from`, `to`.
 
@@ -196,12 +198,12 @@ Fluxo para adicionar rota:
 ## Validação
 
 ```bash
-npm run scan:analitica    # relatório em data/analitica-tools-report.json (44 tools)
+npm run scan:analitica    # relatório em data/analitica-tools-report.json (45 tools)
 npm run audit:analitica   # relatório em data/analitica-tools-audit.json (shape + filtros)
 npm test
 ```
 
-Requer bearer token e cookie do Analítica (`auvp_ensure_auth`). O scan e a auditoria usam `BBAS3` como ticker de exemplo e `limit=20` nos probes de listagem.
+Requer o cookie de sessão do Analítica (`auvp_ensure_auth`). O scan e a auditoria usam `BBAS3` como ticker de exemplo e `limit=20` nos probes de listagem.
 
 ---
 

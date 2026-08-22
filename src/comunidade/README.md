@@ -8,6 +8,7 @@ Módulo MCP para o fórum [AUVP Comunidade](https://comunidade.auvp.com.br/) —
 | **Auth** | Cookie de sessão IPS (`ips4_member_id`, `ips4_login_key`) |
 | **Cookie em disco** | `~/.auvp-financas/comunidade-cookie` |
 | **Contrato** | Busca/notificações em JSON; tópicos e fóruns em HTML parseado pelo MCP |
+| **Tools** | **8**, somente leitura |
 
 O cookie é capturado automaticamente no mesmo login do `auvp_ensure_auth` (junto com bearer e cookie do Analítica). Detalhes no [README principal](../../README.md).
 
@@ -35,7 +36,8 @@ Schemas Zod/JSON compartilhados: `src/mcp/schemas/`.
 
 ## Tools MCP
 
-Prefixo: `auvp_comunidade_`. Liste tudo em runtime com `auvp_comunidade_list_observed_routes`.
+Prefixo: `auvp_comunidade_` (omitido nas tabelas). Liste tudo em runtime com `auvp_comunidade_list_observed_routes`.
+Módulo **somente leitura**: nenhuma tool publica, comenta ou altera conteúdo no fórum.
 
 ### Catálogo e fóruns
 
